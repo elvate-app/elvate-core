@@ -7,17 +7,20 @@ import { ElvateCore } from "../typechain/ElvateCore";
 import { ElvatePair } from "../typechain/ElvatePair";
 import { ElvateSubscription } from "../typechain/ElvateSubscription";
 import { TestERC20 } from "../typechain/TestERC20";
+import { WETH9 } from "../typechain/WETH9";
 import {
   coreFixture,
   pairFixture,
   subscriptionFixture,
   tokenFixture,
+  wrappedFixture,
 } from "./shared/fixtures";
 
 let wallet: Wallet;
 let other: Wallet;
 let pair: ElvatePair;
 let subscription: ElvateSubscription;
+let wrapped: WETH9;
 let core: ElvateCore;
 let token0: TestERC20;
 let token1: TestERC20;
@@ -33,6 +36,7 @@ describe("Elvate Core", function () {
     ({ pair } = await loadFixture(pairFixture));
     ({ token0, token1, token2 } = await loadFixture(tokenFixture));
     ({ subscription } = await loadFixture(subscriptionFixture));
+    ({ wrapped } = await loadFixture(wrappedFixture));
     await pair.createPair(token0.address, token1.address);
     await pair.createPair(token1.address, token0.address);
     await pair.createPair(token2.address, token0.address);
@@ -76,7 +80,7 @@ describe("Elvate Core", function () {
         constants.AddressZero,
         pair.address,
         subscription.address,
-        constants.AddressZero
+        wrapped.address
       );
       expect(await core.pairContractAddress()).to.eq(pair.address);
       expect(await core.routerContractAddress()).to.eq(constants.AddressZero);
@@ -100,7 +104,14 @@ describe("Elvate Core", function () {
 
     describe("Eligible subscriptions", () => {
       it("Should get all the eligible subscriptions", async function () {
-        await core.getEligibleSubscription(token0.address, token1.address);
+        console.log(core.address);
+        await token0.approve(core.address, constants.MaxUint256);
+        await core.depositToken(token0.address, 100); // two triggers
+        const test = await core.getEligibleSubscription(
+          token0.address,
+          token1.address
+        );
+        console.log(test);
       });
     });
 
