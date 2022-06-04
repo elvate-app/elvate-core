@@ -144,7 +144,7 @@ contract ElvateCore is Ownable, ElvateChest {
     }
 
     function _getPath(address _tokenIn, address _tokenOut)
-        public
+        internal
         view
         returns (address[] memory)
     {
@@ -182,16 +182,23 @@ contract ElvateCore is Ownable, ElvateChest {
     ) internal {
         uint256 totalAmountOutDistributed = 0;
         for (uint256 index = 0; index < eligibleSubscriptionsLength; index++) {
-            (, uint256 amountIn, address owner) = ElvateSubscription(
+            (uint256 amountIn, , address owner) = ElvateSubscription(
                 subscriptionContractAddress
             ).allSubscriptions(_eligibleSubscriptions[index]);
             // substract tokenIn from user deposit based on subscription
+
+            require(
+                depositByOwnerByToken[owner][_tokenIn] > amountIn,
+                "Error1"
+            );
             depositByOwnerByToken[owner][_tokenIn] -= amountIn;
 
             // weight of subscription
+            require(_totalAmountIn > 0, "Error2");
             uint256 weight = (amountIn * precision) / _totalAmountIn;
 
             // add amountOut to user based on weight of subscription
+            require(precision > 0, "Error3");
             uint256 amountOut = (_totalAmountOut * weight) / precision;
 
             depositByOwnerByToken[owner][_tokenOut] += amountOut;
@@ -201,6 +208,7 @@ contract ElvateCore is Ownable, ElvateChest {
         }
 
         // keep the small pieces
+        require(_totalAmountOut >= totalAmountOutDistributed, "Error4");
         depositByOwnerByToken[address(this)][_tokenOut] +=
             _totalAmountOut -
             totalAmountOutDistributed;

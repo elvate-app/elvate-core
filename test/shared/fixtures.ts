@@ -1,6 +1,7 @@
 import { BigNumber, Signer } from "ethers";
 import { ethers } from "hardhat";
 import { ElvateCore } from "../../typechain/ElvateCore";
+import { TestElvateCore } from "../../typechain/TestElvateCore";
 import { ElvatePair } from "../../typechain/ElvatePair";
 import { ElvateSubscription } from "../../typechain/ElvateSubscription";
 import { TestERC20 } from "../../typechain/TestERC20";
@@ -70,6 +71,17 @@ export async function coreFixture(): Promise<ElvateCoreFixture> {
   const core = (await factory.deploy()) as ElvateCore;
 
   return { core };
+}
+
+interface TestElvateCoreFixture {
+  testCore: TestElvateCore;
+}
+
+export async function testCoreFixture(): Promise<TestElvateCoreFixture> {
+  const factory = await ethers.getContractFactory("TestElvateCore");
+  const testCore = (await factory.deploy()) as TestElvateCore;
+
+  return { testCore };
 }
 
 interface WrappedFixture {

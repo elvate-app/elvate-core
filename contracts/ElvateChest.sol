@@ -27,13 +27,13 @@ abstract contract ElvateChest {
 
     function depositToken(address _token, uint256 _amount) external {
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
-        depositByOwnerByToken[_token][msg.sender] += _amount;
+        depositByOwnerByToken[msg.sender][_token] += _amount;
         emit TokenDeposited(msg.sender, _token, _amount);
     }
 
     function withdrawToken(address _token, uint256 _amount) external {
         IERC20(_token).safeTransfer(msg.sender, _amount);
-        depositByOwnerByToken[_token][msg.sender] -= _amount;
+        depositByOwnerByToken[msg.sender][_token] -= _amount;
         emit TokenWithdrawal(msg.sender, _token, _amount);
     }
 
@@ -42,12 +42,12 @@ abstract contract ElvateChest {
         view
         returns (uint256)
     {
-        return depositByOwnerByToken[_token][_owner];
+        return depositByOwnerByToken[_owner][_token];
     }
 
     function deposit() external payable {
         IWETH9(wrappedContractAddress).deposit{value: msg.value}();
-        depositByOwnerByToken[wrappedContractAddress][msg.sender] += msg.value;
+        depositByOwnerByToken[msg.sender][wrappedContractAddress] += msg.value;
         emit TokenDeposited(msg.sender, wrappedContractAddress, msg.value);
     }
 }
