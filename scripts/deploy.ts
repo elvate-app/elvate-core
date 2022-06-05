@@ -1,26 +1,49 @@
 import { ethers } from "hardhat";
+import { ElvatePair } from "../typechain/ElvatePair";
+import { ElvateCore } from "../typechain/ElvateCore";
+import { ElvateSubscription } from "../typechain/ElvateSubscription";
 
 async function main() {
   const initialBalance = await (await ethers.getSigners())[0].getBalance();
 
-  const ElvatePairFactory = await ethers.getContractFactory("ElvatePair");
-  const ElvatePair = await ElvatePairFactory.deploy();
-  await ElvatePair.deployed();
-  console.log("ElvatePair deployed to:", ElvatePair.address);
+  const pairFactory = await ethers.getContractFactory("ElvatePair");
+  const pair = (await pairFactory.deploy()) as ElvatePair;
+  await pair.deployed();
+  console.log("ElvatePair deployed to:", pair.address);
 
-  const ElvateSubscriptionFactory = await ethers.getContractFactory(
+  const subscriptionFactory = await ethers.getContractFactory(
     "ElvateSubscription"
   );
-  const ElvateSubscription = await ElvateSubscriptionFactory.deploy();
-  await ElvateSubscription.deployed();
-  console.log("ElvateSubscription deployed to:", ElvateSubscription.address);
+  const subscription =
+    (await subscriptionFactory.deploy()) as ElvateSubscription;
+  await subscription.deployed();
+  console.log("ElvateSubscription deployed to:", subscription.address);
 
-  await ElvateSubscription.updateElvatePairAddress(ElvatePair.address);
-  console.log("ElvateSubscription configured with ElvatePair address");
+  const coreFactory = await ethers.getContractFactory("ElvateCore");
+  const core = (await coreFactory.deploy()) as ElvateCore;
+  await core.deployed();
+  console.log("ElvateCore deployed to:", core.address);
+
+  await subscription.updateElvatePairAddress(pair.address);
+  console.log("ElvateSubscription configured");
+
+  await pair.updateManagerAddress(core.address);
+  console.log("ElvateSubscription configured");
+
+  await core.updateContractAddresses(
+    "0x8954AfA98594b838bda56FE4C12a09D7739D179b",
+    pair.address,
+    subscription.address,
+    "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"
+  );
+  console.log("ElvateCore configured");
 
   const newBalance = await (await ethers.getSigners())[0].getBalance();
-  console.log("cost: ", initialBalance.sub(newBalance).toString());
-  console.log("new balance: ", newBalance.toString());
+  console.log(
+    "cost: ",
+    ethers.utils.formatEther(initialBalance.sub(newBalance))
+  );
+  console.log("new balance: ", ethers.utils.formatEther(newBalance));
 }
 
 // We recommend this pattern to be able to use async/await everywhere

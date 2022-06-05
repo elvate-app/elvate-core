@@ -188,7 +188,7 @@ contract ElvateCore is Ownable, ElvateChest {
             // substract tokenIn from user deposit based on subscription
 
             require(
-                depositByOwnerByToken[owner][_tokenIn] > amountIn,
+                depositByOwnerByToken[owner][_tokenIn] >= amountIn,
                 "Error1"
             );
             depositByOwnerByToken[owner][_tokenIn] -= amountIn;

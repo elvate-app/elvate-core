@@ -1,12 +1,10 @@
-import { BigNumber, Signer } from "ethers";
+import { BigNumber, constants } from "ethers";
 import { ethers } from "hardhat";
 import { ElvateCore } from "../../typechain/ElvateCore";
-import { TestElvateCore } from "../../typechain/TestElvateCore";
 import { ElvatePair } from "../../typechain/ElvatePair";
 import { ElvateSubscription } from "../../typechain/ElvateSubscription";
+import { TestElvateCore } from "../../typechain/TestElvateCore";
 import { TestERC20 } from "../../typechain/TestERC20";
-import { IWBNB } from "../../typechain/IWBNB";
-import { deployContract } from "ethereum-waffle";
 import { WETH9 } from "../../typechain/WETH9";
 
 interface ElvatePairFixture {
@@ -93,4 +91,35 @@ export async function wrappedFixture(): Promise<WrappedFixture> {
   const wrapped = (await factory.deploy()) as WETH9;
 
   return { wrapped };
+}
+
+interface AllFixture {
+  token0: TestERC20;
+  token1: TestERC20;
+  token2: TestERC20;
+  pair: ElvatePair;
+  subscription: ElvateSubscription;
+  core: ElvateCore;
+  testCore: TestElvateCore;
+  wrapped: WETH9;
+}
+
+export async function allFixture(): Promise<AllFixture> {
+  const { token0, token1, token2 } = await tokenFixture();
+  const { pair } = await pairFixture();
+  const { subscription } = await subscriptionFixture();
+  const { wrapped } = await wrappedFixture();
+  const { testCore } = await testCoreFixture();
+  const { core } = await coreFixture();
+
+  return {
+    token0,
+    token1,
+    token2,
+    pair,
+    subscription,
+    core,
+    testCore,
+    wrapped,
+  };
 }
