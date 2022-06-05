@@ -104,21 +104,20 @@ describe("Elvate Core", function () {
 
     describe("Eligible subscriptions", () => {
       it("Should get all the eligible subscriptions", async function () {
-        console.log(core.address);
         await token0.approve(core.address, constants.MaxUint256);
         await core.depositToken(token0.address, 100); // two triggers
-        const test = await core.getEligibleSubscription(
+        const subs = await core.getEligibleSubscription(
           token0.address,
           token1.address
         );
-        console.log(test);
+        expect(subs.length).to.eq(3);
       });
     });
 
-    describe("Trigger subscriptions", () => {
-      it("Should get all the eligible subscriptions", async function () {
-        await core.trigger(token0.address, token1.address);
-      });
-    });
+    // describe("Trigger subscriptions", () => {
+    //   it("Should get all the eligible subscriptions", async function () {
+    //     await core.trigger(token0.address, token1.address);
+    //   });
+    // });
   });
 });
