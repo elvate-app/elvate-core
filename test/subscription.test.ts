@@ -41,30 +41,28 @@ describe("Elvate Pair", function () {
     ({ subscription } = await loadFixture(subscriptionFixture));
   });
 
-  describe("ElvatePairAddress", () => {
+  describe("pairContractAddress", () => {
     it("Should be initialized to zero address", async function () {
-      expect(await subscription.elvatePairAddress()).to.eq(
+      expect(await subscription.pairContractAddress()).to.eq(
         constants.AddressZero
       );
     });
 
     it("Should modify ElvatePair address correctly with AddressZero", async function () {
-      await subscription.updateElvatePairAddress(constants.AddressZero);
-      expect(await subscription.elvatePairAddress()).to.eq(
+      await subscription.updateAddress(constants.AddressZero);
+      expect(await subscription.pairContractAddress()).to.eq(
         constants.AddressZero
       );
     });
 
     it("Should modify ElvatePair address correctly with ElvatePair address", async function () {
-      await subscription.updateElvatePairAddress(pair.address);
-      expect(await subscription.elvatePairAddress()).to.eq(pair.address);
+      await subscription.updateAddress(pair.address);
+      expect(await subscription.pairContractAddress()).to.eq(pair.address);
     });
 
     it("Should failed on other user", async function () {
       await expect(
-        subscription
-          .connect(other)
-          .updateElvatePairAddress(constants.AddressZero)
+        subscription.connect(other).updateAddress(constants.AddressZero)
       ).to.revertedWith("Ownable: caller is not the owner");
     });
   });

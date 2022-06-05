@@ -23,7 +23,7 @@ contract ElvateSubscription is Ownable {
     mapping(address => mapping(address => mapping(address => uint256)))
         public subscriptionIdByOwnerTokenInTokenOut;
     /// elvate pair contract address
-    address public elvatePairAddress;
+    address public pairContractAddress;
 
     /// @dev subscribe to a pair
     /// @param _tokenIn address of tokenIn
@@ -77,12 +77,9 @@ contract ElvateSubscription is Ownable {
     }
 
     /// @dev update ElvatePair contract address
-    /// @param _elvatePairAddress new ElvatePair contract address
-    function updateElvatePairAddress(address _elvatePairAddress)
-        external
-        onlyOwner
-    {
-        elvatePairAddress = _elvatePairAddress;
+    /// @param _pairContractAddress new ElvatePair contract address
+    function updateAddress(address _pairContractAddress) external onlyOwner {
+        pairContractAddress = _pairContractAddress;
     }
 
     /// @dev get ElvatePair id
@@ -94,7 +91,7 @@ contract ElvateSubscription is Ownable {
         returns (uint256)
     {
         return
-            ElvatePair(elvatePairAddress).pairIdByTokenInOut(
+            ElvatePair(pairContractAddress).pairIdByTokenInOut(
                 _tokenIn,
                 _tokenOut
             );

@@ -24,7 +24,7 @@ async function main() {
   await core.deployed();
   console.log("ElvateCore deployed to:", core.address);
 
-  await subscription.updateElvatePairAddress(pair.address);
+  await subscription.updateAddress(pair.address);
   console.log("ElvateSubscription configured");
 
   await pair.updateAddress(core.address);

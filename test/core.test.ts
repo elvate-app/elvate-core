@@ -40,7 +40,7 @@ describe("Elvate Core", function () {
     await pair.createPair(token0.address, token1.address);
     await pair.createPair(token1.address, token0.address);
     await pair.createPair(token2.address, token0.address);
-    await subscription.updateElvatePairAddress(pair.address);
+    await subscription.updateAddress(pair.address);
     await subscription.subscribe(token0.address, token1.address, 50);
     await subscription
       .connect(other)
