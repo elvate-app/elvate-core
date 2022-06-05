@@ -97,7 +97,7 @@ contract ElvatePair is Ownable {
         coreContractAddress = _coreContractAddress;
     }
 
-    /// @dev trigger a pair
+    /// @dev update lastPaidAt of specific pair
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
     function trigger(address _tokenIn, address _tokenOut)

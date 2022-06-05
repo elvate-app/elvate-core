@@ -33,6 +33,11 @@ contract ElvateCore is Ownable, ElvateChest {
         uint256 fees
     );
 
+    /// @dev update of contracts addresses that interact with this one
+    /// @param _routerContractAddress uniswap router contract address
+    /// @param _pairContractAddress elvate pair contract address
+    /// @param _subscriptionContractAddress elvate subscription contract address
+    /// @param _wrappedContractAddress wrapped token contract address
     function updateContractAddresses(
         address _routerContractAddress,
         address _pairContractAddress,
