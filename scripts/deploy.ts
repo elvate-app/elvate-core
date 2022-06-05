@@ -27,7 +27,7 @@ async function main() {
   await subscription.updateElvatePairAddress(pair.address);
   console.log("ElvateSubscription configured");
 
-  await pair.updateManagerAddress(core.address);
+  await pair.updateAddress(core.address);
   console.log("ElvateSubscription configured");
 
   await core.updateContractAddresses(

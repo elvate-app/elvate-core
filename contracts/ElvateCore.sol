@@ -63,11 +63,6 @@ contract ElvateCore is Ownable, ElvateChest {
             IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn),
             "approve failed"
         );
-        uint256 allowance = IERC20(_tokenIn).allowance(
-            address(this),
-            routerContractAddress
-        );
-        require(allowance >= totalAmountIn, "Token allowance not sufficient");
 
         uint256[] memory amounts = IUniswapV2Router02(routerContractAddress)
             .getAmountsOut(totalAmountIn, path);

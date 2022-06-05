@@ -28,19 +28,19 @@ describe("Elvate Pair", function () {
     ({ token0, token1, token2 } = await loadFixture(tokenFixture));
   });
 
-  describe("ManagerAddress", () => {
+  describe("coreContractAddress", () => {
     it("Should be initialized to zero address", async function () {
-      expect(await pair.managerAddress()).to.eq(constants.AddressZero);
+      expect(await pair.coreContractAddress()).to.eq(constants.AddressZero);
     });
 
     it("Should modify pair manager correctly", async function () {
-      await pair.updateManagerAddress(wallet.address);
-      expect(await pair.managerAddress()).to.eq(wallet.address);
+      await pair.updateAddress(wallet.address);
+      expect(await pair.coreContractAddress()).to.eq(wallet.address);
     });
 
     it("Should failed on other user", async function () {
       await expect(
-        pair.connect(other).updateManagerAddress(pair.address)
+        pair.connect(other).updateAddress(pair.address)
       ).to.revertedWith("Ownable: caller is not the owner");
     });
   });

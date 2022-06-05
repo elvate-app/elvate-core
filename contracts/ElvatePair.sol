@@ -21,7 +21,7 @@ contract ElvatePair is Ownable {
     /// frequency
     uint16 public frequency = 60 * 6;
     /// pair manager
-    address public managerAddress;
+    address public coreContractAddress;
     /// pair by tokenIn tokenOut
     mapping(address => mapping(address => uint256)) public pairIdByTokenInOut;
 
@@ -31,8 +31,8 @@ contract ElvatePair is Ownable {
     event PairTriggered(uint256 indexed pairId, uint256 lastPaidAt);
 
     /// @dev verify if pair doesn't exist
-    /// @param _tokenIn address of tokenIn
-    /// @param _tokenOut address of tokenOut
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     modifier onlyNonExistingPair(address _tokenIn, address _tokenOut) {
         // pair with id of 0 is not initialized
         require(
@@ -43,24 +43,24 @@ contract ElvatePair is Ownable {
     }
 
     /// @dev verify if pair exist
-    /// @param _tokenIn address of tokenIn
-    /// @param _tokenOut address of tokenOut
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     modifier onlyExistingPair(address _tokenIn, address _tokenOut) {
         require(pairIdByTokenInOut[_tokenIn][_tokenOut] > 0, "No pair found");
         _;
     }
 
     /// @dev verify if tokenIn is diffent to tokenOut
-    /// @param _tokenIn address of tokenIn
-    /// @param _tokenOut address of tokenOut
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     modifier onlyDifferentTokens(address _tokenIn, address _tokenOut) {
         require(_tokenIn != _tokenOut, "Tokens cannot be identical");
         _;
     }
 
     /// @dev create pair
-    /// @param _tokenIn address of tokenIn
-    /// @param _tokenOut address of tokenOut
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     function createPair(address _tokenIn, address _tokenOut)
         external
         payable
@@ -86,16 +86,20 @@ contract ElvatePair is Ownable {
     }
 
     /// @dev update pair creation fee
+    /// @param _fees value of fees to update
     function updateFees(uint128 _fees) external onlyOwner {
         fees = _fees;
     }
 
     /// @dev update manager address
-    function updateManagerAddress(address _managerAddress) external onlyOwner {
-        managerAddress = _managerAddress;
+    /// @param _coreContractAddress value of fees to update
+    function updateAddress(address _coreContractAddress) external onlyOwner {
+        coreContractAddress = _coreContractAddress;
     }
 
     /// @dev trigger a pair
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     function trigger(address _tokenIn, address _tokenOut)
         external
         onlyExistingPair(_tokenIn, _tokenOut)
@@ -106,7 +110,7 @@ contract ElvatePair is Ownable {
                 block.timestamp,
             "Unable to trigger right now"
         );
-        require(msg.sender == managerAddress, "Caller is not the manager");
+        require(msg.sender == coreContractAddress, "Caller is not the manager");
 
         allPairs[pairIdByTokenInOut[_tokenIn][_tokenOut] - 1].lastPaidAt = block
             .timestamp;

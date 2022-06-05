@@ -118,7 +118,7 @@ describe("Elvate Core", function () {
       await pair.createPair(token0.address, token1.address);
       await pair.createPair(token1.address, token2.address);
 
-      pair.updateManagerAddress(core.address);
+      pair.updateAddress(core.address);
       subscription.updateElvatePairAddress(pair.address);
       testCore.updateContractAddresses(
         constants.AddressZero,

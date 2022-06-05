@@ -49,7 +49,7 @@ describe("Elvate Core", function () {
 
   beforeEach("deploy fixture", async () => {
     ({ core } = await loadFixture(coreFixture));
-    await pair.updateManagerAddress(core.address);
+    await pair.updateAddress(core.address);
   });
 
   describe("Contract addresses", () => {
