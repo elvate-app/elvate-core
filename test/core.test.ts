@@ -1,25 +1,16 @@
 import { expect } from "chai";
-import { createFixtureLoader } from "ethereum-waffle";
-import { BigNumber, constants, Wallet } from "ethers";
-import { ethers } from "hardhat";
+import { constants, Wallet } from "ethers";
+import { ethers, waffle } from "hardhat";
 import { beforeEach } from "mocha";
 import { ElvateCore } from "../typechain/ElvateCore";
-import { ElvatePair } from "../typechain/ElvatePair";
-import { ElvateSubscription } from "../typechain/ElvateSubscription";
 import { TestERC20 } from "../typechain/TestERC20";
 import { WETH9 } from "../typechain/WETH9";
-import {
-  coreFixture,
-  pairFixture,
-  subscriptionFixture,
-  tokenFixture,
-  wrappedFixture,
-} from "./shared/fixtures";
+import { coreFixture, tokenFixture, wrappedFixture } from "./shared/fixtures";
+
+const createFixtureLoader = waffle.createFixtureLoader;
 
 let wallet: Wallet;
 let other: Wallet;
-let pair: ElvatePair;
-let subscription: ElvateSubscription;
 let wrapped: WETH9;
 let core: ElvateCore;
 let token0: TestERC20;
@@ -27,97 +18,198 @@ let token1: TestERC20;
 let token2: TestERC20;
 let loadFixture: ReturnType<typeof createFixtureLoader>;
 
-let fees: BigNumber;
-
 describe("Elvate Core", function () {
   before("create fixtures", async () => {
     [wallet, other] = await (ethers as any).getSigners();
     loadFixture = createFixtureLoader([wallet, other]);
-    ({ pair } = await loadFixture(pairFixture));
     ({ token0, token1, token2 } = await loadFixture(tokenFixture));
-    ({ subscription } = await loadFixture(subscriptionFixture));
     ({ wrapped } = await loadFixture(wrappedFixture));
-    await pair.createPair(token0.address, token1.address);
-    await pair.createPair(token1.address, token0.address);
-    await pair.createPair(token2.address, token0.address);
-    await subscription.updateAddress(pair.address);
-    await subscription.subscribe(token0.address, token1.address, 50);
-    await subscription
-      .connect(other)
-      .subscribe(token0.address, token1.address, 100);
   });
 
   beforeEach("deploy fixture", async () => {
-    ({ core } = await loadFixture(coreFixture));
-    await pair.updateAddress(core.address);
+    ({ core } = await loadFixture(() => coreFixture(constants.AddressZero, wrapped.address)));
   });
 
-  describe("Contract addresses", () => {
-    it("Should be initialized to zero address", async function () {
-      expect(await core.pairContractAddress()).to.eq(constants.AddressZero);
-      expect(await core.routerContractAddress()).to.eq(constants.AddressZero);
-      expect(await core.subscriptionContractAddress()).to.eq(
-        constants.AddressZero
-      );
+  it("constructor initialize immutable router contract address", async function () {
+    expect(await core.routerContractAddress()).to.eq(constants.AddressZero);
+  });
+
+  it("constructor initialize immutable wrapped contract address", async function () {
+    expect(await core.wrappedContractAddress()).to.eq(wrapped.address);
+  });
+
+  describe("Eligible subscriptions", () => {
+    beforeEach(async () => {
+      // create 3 pairs
+      await core.createPair(token0.address, token1.address);
+      await core.createPair(token1.address, token2.address);
+      await core.createPair(token2.address, token0.address);
+
+      // initialize deposit for all tokens
+      for (const token of [token0, token1, token2]) {
+        await token.transfer(other.address, 10000000);
+        await token.approve(core.address, constants.MaxUint256);
+        await token.connect(other).approve(core.address, constants.MaxUint256);
+        await core.depositToken(token.address, 10000000);
+        await core.connect(other).depositToken(token.address, 10000000);
+      }
     });
 
-    it("Should modify addresses correctly with AddressZero", async function () {
-      await core.updateContractAddresses(
-        constants.AddressZero,
-        constants.AddressZero,
-        constants.AddressZero,
-        constants.AddressZero
-      );
-      expect(await core.pairContractAddress()).to.eq(constants.AddressZero);
-      expect(await core.routerContractAddress()).to.eq(constants.AddressZero);
-      expect(await core.subscriptionContractAddress()).to.eq(
-        constants.AddressZero
-      );
-    });
+    describe("No subscriptions", () => {
+      it("return no subscription for token0, token1", async () => {
+        const subs = await core.getEligibleSubscription(token0.address, token1.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
 
-    it("Should modify ElvatePair address correctly with right addresses", async function () {
-      await core.updateContractAddresses(
-        constants.AddressZero,
-        pair.address,
-        subscription.address,
-        wrapped.address
-      );
-      expect(await core.pairContractAddress()).to.eq(pair.address);
-      expect(await core.routerContractAddress()).to.eq(constants.AddressZero);
-      expect(await core.subscriptionContractAddress()).to.eq(
-        subscription.address
-      );
-    });
+      it("return no subscription for token1, token2", async () => {
+        const subs = await core.getEligibleSubscription(token1.address, token2.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
 
-    it("Should failed on other user", async function () {
-      await expect(
-        core
-          .connect(other)
-          .updateContractAddresses(
-            constants.AddressZero,
-            constants.AddressZero,
-            constants.AddressZero,
-            constants.AddressZero
-          )
-      ).to.revertedWith("Ownable: caller is not the owner");
-    });
+      it("return no subscription for token2, token0", async () => {
+        const subs = await core.getEligibleSubscription(token2.address, token0.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
 
-    describe("Eligible subscriptions", () => {
-      it("Should get all the eligible subscriptions", async function () {
-        await token0.approve(core.address, constants.MaxUint256);
-        await core.depositToken(token0.address, 100); // two triggers
-        const subs = await core.getEligibleSubscription(
-          token0.address,
-          token1.address
-        );
-        expect(subs.length).to.eq(3);
+      it("return no subscription for invalid pair", async () => {
+        const subs = await core.getEligibleSubscription(token1.address, token0.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
       });
     });
 
-    // describe("Trigger subscriptions", () => {
-    //   it("Should get all the eligible subscriptions", async function () {
-    //     await core.trigger(token0.address, token1.address);
-    //   });
-    // });
+    describe("One subscription to token0, token1", () => {
+      let subs_length: number;
+
+      beforeEach(async () => {
+        await core.connect(other).subscribe(token0.address, token1.address, 50);
+        subs_length = (await core.getAllSubscriptions()).length;
+      });
+
+      it("return only one subscription for token0, token1", async function () {
+        const subs = await core.getEligibleSubscription(token0.address, token1.address);
+        expect(subs[0].length).to.eq(subs_length);
+        expect(subs[0][0]).to.eq(0);
+        expect(subs[1]).to.eq(50);
+        expect(subs[2]).to.eq(1);
+      });
+
+      it("return no subscriptions for token1, token2", async function () {
+        const subs = await core.getEligibleSubscription(token1.address, token2.address);
+        expect(subs[0].length).to.eq(subs_length);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("return no subscriptions for token2, token0", async function () {
+        const subs = await core.getEligibleSubscription(token1.address, token2.address);
+        expect(subs[0].length).to.eq(subs_length);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("return no subscriptions for invalid pair", async function () {
+        const subs = await core.getEligibleSubscription(token1.address, token0.address);
+        expect(subs[0].length).to.eq(subs_length);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+    });
+
+    describe("One subscription with max deposit value to token0, token1", () => {
+      let subs_length: number;
+
+      beforeEach(async () => {
+        await core.connect(other).subscribe(token0.address, token1.address, 10000000);
+        subs_length = (await core.getAllSubscriptions()).length;
+      });
+
+      it("return only one subscription for token0, token1", async function () {
+        const subs = await core.getEligibleSubscription(token0.address, token1.address);
+        expect(subs[0].length).to.eq(subs_length);
+        expect(subs[0][0]).to.eq(0);
+        expect(subs[1]).to.eq(10000000);
+        expect(subs[2]).to.eq(1);
+      });
+    });
+
+    describe("Multiple subscriptions to token0, token1", () => {
+      beforeEach(async () => {
+        await core.subscribe(token0.address, token1.address, 50);
+      });
+
+      describe("With 2 valid subscriptions", () => {
+        beforeEach("Subscribe other to token0, token1", async () => {
+          await core.connect(other).subscribe(token0.address, token1.address, 180);
+        });
+
+        it("return two valid subscriptions to token0, token1", async () => {
+          const subs = await core.getEligibleSubscription(token0.address, token1.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(0);
+          expect(subs[0][1]).to.eq(1);
+          expect(subs[1]).to.eq(230);
+          expect(subs[2]).to.eq(2);
+        });
+
+        it("return no valid subscriptions to token1, token2", async () => {
+          const subs = await core.getEligibleSubscription(token1.address, token2.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(0);
+          expect(subs[0][1]).to.eq(0);
+          expect(subs[1]).to.eq(0);
+          expect(subs[2]).to.eq(0);
+        });
+
+        it("return no valid subscriptions to invalid pair", async () => {
+          const subs = await core.getEligibleSubscription(token1.address, token0.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(0);
+          expect(subs[0][1]).to.eq(0);
+          expect(subs[1]).to.eq(0);
+          expect(subs[2]).to.eq(0);
+        });
+      });
+
+      describe("With one valid and one invalid subscriptions", () => {
+        beforeEach("Subscribe other to token0, token1", async () => {
+          await core.connect(other).subscribe(token0.address, token1.address, 10000001);
+        });
+
+        it("return one valid subscriptions to token0, token1", async () => {
+          const subs = await core.getEligibleSubscription(token0.address, token1.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(0);
+          expect(subs[0][1]).to.eq(0);
+          expect(subs[1]).to.eq(50);
+          expect(subs[2]).to.eq(1);
+        });
+
+        it("return no valid subscriptions to token1, token2", async () => {
+          const subs = await core.getEligibleSubscription(token1.address, token2.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(0);
+          expect(subs[0][1]).to.eq(0);
+          expect(subs[1]).to.eq(0);
+          expect(subs[2]).to.eq(0);
+        });
+
+        it("return no valid subscriptions to invalid pair", async () => {
+          const subs = await core.getEligibleSubscription(token1.address, token0.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(0);
+          expect(subs[0][1]).to.eq(0);
+          expect(subs[1]).to.eq(0);
+          expect(subs[2]).to.eq(0);
+        });
+      });
+    });
   });
 });

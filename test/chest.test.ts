@@ -1,19 +1,15 @@
 import { expect } from "chai";
 import { createFixtureLoader } from "ethereum-waffle";
-import { BigNumber, constants, Wallet } from "ethers";
+import { constants, Wallet } from "ethers";
 import { ethers } from "hardhat";
 import { beforeEach } from "mocha";
 import { ElvateCore } from "../typechain/ElvateCore";
-import { ElvatePair } from "../typechain/ElvatePair";
-import { ElvateSubscription } from "../typechain/ElvateSubscription";
 import { TestERC20 } from "../typechain/TestERC20";
 import { WETH9 } from "../typechain/WETH9";
 import { coreFixture, tokenFixture, wrappedFixture } from "./shared/fixtures";
 
 let wallet: Wallet;
 let other: Wallet;
-// let pair: ElvatePair;
-// let subscription: ElvateSubscription;
 let wrapped: WETH9;
 let core: ElvateCore;
 let token0: TestERC20;
@@ -21,173 +17,279 @@ let token1: TestERC20;
 let token2: TestERC20;
 let loadFixture: ReturnType<typeof createFixtureLoader>;
 
-let fees: BigNumber;
-
-describe("Elvate Core", function () {
+describe("Elvate Chest", function () {
   before("create fixtures", async () => {
     [wallet, other] = await (ethers as any).getSigners();
     loadFixture = createFixtureLoader([wallet, other]);
     ({ token0, token1, token2 } = await loadFixture(tokenFixture));
     ({ wrapped } = await loadFixture(wrappedFixture));
-    token0.transfer(
-      other.address,
-      (await token0.balanceOf(wallet.address)).div(2)
-    );
-    token1.transfer(
-      other.address,
-      (await token1.balanceOf(wallet.address)).div(2)
-    );
   });
 
   beforeEach("deploy fixture", async () => {
-    ({ core } = await loadFixture(coreFixture));
-    await core.updateContractAddresses(
-      constants.AddressZero,
-      constants.AddressZero,
-      constants.AddressZero,
-      wrapped.address
-    );
+    ({ core } = await loadFixture(() => coreFixture(constants.AddressZero, wrapped.address)));
   });
 
-  describe("Deposits", () => {
-    it("Should be init to 0 for owner", async function () {
-      expect(
-        await core.getDepositedToken(wallet.address, token0.address)
-      ).to.eq(0);
-      expect(
-        await core.getDepositedToken(wallet.address, token1.address)
-      ).to.eq(0);
-      expect(
-        await core.getDepositedToken(wallet.address, token2.address)
-      ).to.eq(0);
-    });
-
-    it("Should be init to 0 for other", async function () {
-      expect(await core.getDepositedToken(other.address, token0.address)).to.eq(
-        0
-      );
-      expect(await core.getDepositedToken(other.address, token1.address)).to.eq(
-        0
-      );
-      expect(await core.getDepositedToken(other.address, token2.address)).to.eq(
-        0
-      );
-    });
-
-    it("Should deposit token0 by owner", async function () {
-      await token0.approve(core.address, constants.MaxUint256);
-      await core.depositToken(token0.address, 10);
-      expect(
-        await core.getDepositedToken(wallet.address, token0.address)
-      ).to.eq(10);
-    });
-
-    it("Should deposit native to wrapped", async function () {
-      await core.deposit({ value: 25 });
-      expect(
-        await core.getDepositedToken(wallet.address, wrapped.address)
-      ).to.eq(25);
-    });
-
-    it("Should deposit token1 by other", async function () {
-      await token1.connect(other).approve(core.address, constants.MaxUint256);
-      await core.connect(other).depositToken(token1.address, 60);
-      expect(await core.getDepositedToken(other.address, token1.address)).to.eq(
-        60
-      );
-    });
-
-    it("Should deposit token1 by owner", async function () {
-      await token1.approve(core.address, constants.MaxUint256);
-      await core.depositToken(token1.address, 80);
-      expect(
-        await core.getDepositedToken(wallet.address, token1.address)
-      ).to.eq(80);
-    });
-
-    it("Should revert with no allowance", async function () {
-      await expect(core.depositToken(token2.address, 80)).to.revertedWith(
-        "ERC20: insufficient allowance"
-      );
-    });
-
-    it("Should revert with insufficient allowance", async function () {
-      await token2.approve(core.address, 40);
-      await expect(core.depositToken(token2.address, 80)).to.revertedWith(
-        "ERC20: insufficient allowance"
-      );
-    });
-
-    it("Should revert with insufficient funds", async function () {
-      await expect(
-        core.depositToken(
-          token1.address,
-          (await token1.balanceOf(wallet.address)).add(1)
-        )
-      ).to.revertedWith("ERC20: transfer amount exceeds balance");
+  it("return 0 deposit for owner", async () => {
+    [token0, token1, token2].forEach(async (token) => {
+      expect(await core.depositByOwnerByToken(wallet.address, token.address)).to.eq(0);
     });
   });
 
-  describe("Withdrawal", () => {
-    it("Should withdraw for owner ", async function () {
-      await core.withdrawToken(token0.address, 10);
-      await core.withdrawToken(token1.address, 10);
-      expect(
-        await core.getDepositedToken(wallet.address, token0.address)
-      ).to.eq(0);
-      expect(
-        await core.getDepositedToken(wallet.address, token1.address)
-      ).to.eq(70);
-      expect(
-        await core.getDepositedToken(wallet.address, token2.address)
-      ).to.eq(0);
-      await core.withdrawToken(token1.address, 20);
-      expect(
-        await core.getDepositedToken(wallet.address, token1.address)
-      ).to.eq(50);
-      await core.withdrawToken(token1.address, 50);
-      expect(
-        await core.getDepositedToken(wallet.address, token1.address)
-      ).to.eq(0);
-    });
-
-    it("Should withdraw for other", async function () {
-      await core.connect(other).withdrawToken(token1.address, 60);
-      expect(await core.getDepositedToken(other.address, token1.address)).to.eq(
-        0
-      );
-    });
-
-    it("Should revert with too hight withdraw amount", async function () {
-      await expect(
-        core.connect(other).withdrawToken(token1.address, 60)
-      ).to.revertedWith("ERC20: transfer amount exceeds balance");
-    });
-
-    it("Should revert with max withdraw amount", async function () {
-      await expect(
-        core.connect(other).withdrawToken(token1.address, constants.MaxUint256)
-      ).to.revertedWith("ERC20: transfer amount exceeds balance");
+  it("return 0 deposit for other", async () => {
+    [token0, token1, token2].forEach(async (token) => {
+      expect(await core.depositByOwnerByToken(other.address, token.address)).to.eq(0);
     });
   });
 
-  describe("Events", () => {
-    it("Should emit an event on token deposit", async function () {
-      await expect(core.depositToken(token1.address, 45))
-        .to.emit(core, "TokenDeposited")
-        .withArgs(wallet.address, token1.address, 45);
+  describe("Deposit token with owner", () => {
+    beforeEach("Initialize allowance", async () => {
+      for (const token of [token0, token1, token2]) {
+        await token.approve(core.address, 1000000);
+      }
     });
 
-    it("Should emit an event on deposit", async function () {
-      await expect(core.deposit({ value: 30 }))
-        .to.emit(core, "TokenDeposited")
-        .withArgs(wallet.address, wrapped.address, 30);
+    describe("First deposit with owner", () => {
+      for (const amount of [0, 1, 5, 500, 1000, 1000000]) {
+        it(`return correct value for first ${amount} deposit with token0`, async () => {
+          await core.depositToken(token0.address, amount);
+          expect(await core.depositByOwnerByToken(wallet.address, token0.address)).to.eq(amount);
+
+          // other are set to 0
+          expect(await core.depositByOwnerByToken(other.address, token0.address)).to.eq(0);
+
+          for (const token of [token1, token2]) {
+            expect(await core.depositByOwnerByToken(wallet.address, token.address)).to.eq(0);
+            expect(await core.depositByOwnerByToken(other.address, token.address)).to.eq(0);
+          }
+        });
+      }
+
+      it("revert with insufficient allowance with token0", async () => {
+        await expect(core.depositToken(token0.address, 1000001)).to.revertedWith("ERC20: insufficient allowance");
+      });
+
+      it("revert with insufficient balance with token0", async () => {
+        await token0.approve(core.address, constants.MaxUint256);
+        const balance = await token0.balanceOf(wallet.address);
+        await expect(core.depositToken(token0.address, balance.add(1))).to.revertedWith(
+          "ERC20: transfer amount exceeds balance"
+        );
+      });
+
+      for (const amount of [0, 1, 5, 500, 1000, 1000000]) {
+        it(`return correct value for first ${amount} deposit with token1`, async () => {
+          await core.depositToken(token1.address, amount);
+          expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(amount);
+
+          // other are set to 0
+          expect(await core.depositByOwnerByToken(other.address, token1.address)).to.eq(0);
+
+          for (const token of [token0, token2]) {
+            expect(await core.depositByOwnerByToken(wallet.address, token.address)).to.eq(0);
+            expect(await core.depositByOwnerByToken(other.address, token.address)).to.eq(0);
+          }
+        });
+      }
+
+      it("revert with insufficient allowance with token1", async () => {
+        await expect(core.depositToken(token1.address, 1000001)).to.revertedWith("ERC20: insufficient allowance");
+      });
+
+      it("revert with insufficient balance with token1", async () => {
+        await token1.approve(core.address, constants.MaxUint256);
+        const balance = await token1.balanceOf(wallet.address);
+        await expect(core.depositToken(token1.address, balance.add(1))).to.revertedWith(
+          "ERC20: transfer amount exceeds balance"
+        );
+      });
+
+      it("emit an event on deposit", async () => {
+        await expect(core.depositToken(token1.address, 3000))
+          .to.emit(core, "TokenDeposited")
+          .withArgs(wallet.address, token1.address, 3000);
+      });
     });
 
-    it("Should emit an event on withdraw", async function () {
-      await expect(core.withdrawToken(token1.address, 20))
+    describe("Multiple deposit with owner", () => {
+      beforeEach("Deposit one time", async () => {
+        await core.depositToken(token1.address, 100000);
+      });
+
+      for (const amount of [0, 1, 5, 500, 1000, 900000]) {
+        it(`return correct value for ${amount} deposit with initial deposit`, async () => {
+          await core.depositToken(token1.address, amount);
+          expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(amount + 100000);
+          expect(await core.depositByOwnerByToken(other.address, token1.address)).to.eq(0);
+        });
+      }
+
+      it("revert with insufficient allowance with token1", async () => {
+        await expect(core.depositToken(token1.address, 1000000)).to.revertedWith("ERC20: insufficient allowance");
+      });
+
+      it("revert with insufficient balance with token1", async () => {
+        await token1.approve(core.address, constants.MaxUint256);
+        const balance = await token0.balanceOf(wallet.address);
+        await expect(core.depositToken(token1.address, balance.add(1))).to.revertedWith(
+          "ERC20: transfer amount exceeds balance"
+        );
+      });
+    });
+  });
+
+  describe("Withdraw token with owner", () => {
+    beforeEach("Initialize deposit", async () => {
+      for (const token of [token0, token1, token2]) {
+        await token.approve(core.address, 1000000);
+      }
+
+      await core.depositToken(token0.address, 5000);
+      await core.depositToken(token1.address, 1000000);
+    });
+
+    for (const amount of [0, 10, 500, 5000]) {
+      it(`return correct value after withdrawing ${amount} of token0`, async () => {
+        await core.withdrawToken(token0.address, amount);
+        expect(await core.depositByOwnerByToken(wallet.address, token0.address)).to.eq(5000 - amount);
+        expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(1000000);
+      });
+    }
+
+    for (const amount of [0, 10, 500, 5000]) {
+      it(`return correct value after withdrawing ${amount} of token1`, async () => {
+        await core.withdrawToken(token1.address, amount);
+        expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(1000000 - amount);
+        expect(await core.depositByOwnerByToken(wallet.address, token0.address)).to.eq(5000);
+      });
+    }
+
+    it("revert with insufficient deposit for token0", async () => {
+      await expect(core.withdrawToken(token0.address, 5000 + 1)).to.revertedWith("Not enought deposit");
+    });
+
+    it("revert with insufficient deposit for token1", async () => {
+      await expect(core.withdrawToken(token1.address, 1000000 + 1)).to.revertedWith("Not enought deposit");
+    });
+
+    it("emit an event on withdrawal", async () => {
+      await expect(core.withdrawToken(token1.address, 3000))
         .to.emit(core, "TokenWithdrawal")
-        .withArgs(wallet.address, token1.address, 20);
+        .withArgs(wallet.address, token1.address, 3000);
+    });
+  });
+
+  describe("Deposit wrapped", () => {
+    for (const amount of [0, 1, 5, 500, 1000, 1000000]) {
+      it(`return correct value for ${amount} deposit`, async () => {
+        await core.deposit({ value: amount });
+        expect(await core.depositByOwnerByToken(wallet.address, wrapped.address)).to.eq(amount);
+      });
+    }
+
+    for (const amount of [0, 1, 5, 500, 1000, 1000000]) {
+      it(`return correct value for ${amount} deposit with initial deposit`, async () => {
+        await core.deposit({ value: 1000 });
+        await core.deposit({ value: amount });
+        expect(await core.depositByOwnerByToken(wallet.address, wrapped.address)).to.eq(1000 + amount);
+      });
+    }
+  });
+
+  describe("Other user", () => {
+    beforeEach("Init deposit with owner, other wallet", async () => {
+      for (const token of [token0, token1, token2]) {
+        await token.approve(core.address, 1000000);
+        token.transfer(other.address, 1000000);
+        await token.connect(other).approve(core.address, 1000000);
+      }
+
+      await core.depositToken(token0.address, 500);
+      await core.depositToken(token1.address, 1500);
+      await core.depositToken(token2.address, 3500);
+    });
+
+    describe("Deposit with other", () => {
+      it("return correct value for deposit token0", async () => {
+        await core.connect(other).depositToken(token0.address, 50);
+        expect(await core.depositByOwnerByToken(other.address, token0.address)).to.eq(50);
+        expect(await core.depositByOwnerByToken(wallet.address, token0.address)).to.eq(500);
+
+        for (const token of [token1, token2]) {
+          expect(await core.depositByOwnerByToken(other.address, token.address)).to.eq(0);
+        }
+      });
+
+      it("return correct value for deposit token1", async () => {
+        await core.connect(other).depositToken(token1.address, 3000);
+        expect(await core.depositByOwnerByToken(other.address, token1.address)).to.eq(3000);
+        expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(1500);
+
+        for (const token of [token0, token2]) {
+          expect(await core.depositByOwnerByToken(other.address, token.address)).to.eq(0);
+        }
+      });
+
+      it("emit an event on deposit", async () => {
+        await expect(core.connect(other).depositToken(token1.address, 3000))
+          .to.emit(core, "TokenDeposited")
+          .withArgs(other.address, token1.address, 3000);
+      });
+    });
+
+    describe("Withdraw with other", () => {
+      beforeEach("Init deposit with other", async () => {
+        await core.connect(other).depositToken(token0.address, 1000000);
+        await core.connect(other).depositToken(token1.address, 6432);
+      });
+
+      it("return correct value for deposit token0", async () => {
+        await core.connect(other).withdrawToken(token0.address, 50000);
+        expect(await core.depositByOwnerByToken(other.address, token0.address)).to.eq(1000000 - 50000);
+        expect(await core.depositByOwnerByToken(other.address, token1.address)).to.eq(6432);
+        expect(await core.depositByOwnerByToken(other.address, token2.address)).to.eq(0);
+
+        // owner
+        expect(await core.depositByOwnerByToken(wallet.address, token0.address)).to.eq(500);
+        expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(1500);
+        expect(await core.depositByOwnerByToken(wallet.address, token2.address)).to.eq(3500);
+      });
+
+      it("return correct value for deposit token1", async () => {
+        await core.connect(other).withdrawToken(token1.address, 5000);
+        expect(await core.depositByOwnerByToken(other.address, token1.address)).to.eq(6432 - 5000);
+        expect(await core.depositByOwnerByToken(other.address, token0.address)).to.eq(1000000);
+        expect(await core.depositByOwnerByToken(other.address, token2.address)).to.eq(0);
+
+        // owner
+        expect(await core.depositByOwnerByToken(wallet.address, token0.address)).to.eq(500);
+        expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(1500);
+        expect(await core.depositByOwnerByToken(wallet.address, token2.address)).to.eq(3500);
+      });
+
+      it("emit an event on withdraw", async () => {
+        await expect(core.connect(other).withdrawToken(token1.address, 5000))
+          .to.emit(core, "TokenWithdrawal")
+          .withArgs(other.address, token1.address, 5000);
+      });
+    });
+
+    describe("Deposit wrapped with other", () => {
+      for (const amount of [0, 1, 5, 500, 1000, 1000000]) {
+        it(`return correct value for ${amount} deposit`, async () => {
+          await core.connect(other).deposit({ value: amount });
+          expect(await core.depositByOwnerByToken(other.address, wrapped.address)).to.eq(amount);
+          expect(await core.depositByOwnerByToken(wallet.address, wrapped.address)).to.eq(0);
+        });
+      }
+
+      for (const amount of [0, 1, 5, 500, 1000, 1000000]) {
+        it(`return correct value for ${amount} deposit with initial deposit`, async () => {
+          await core.connect(other).deposit({ value: 1000 });
+          await core.connect(other).deposit({ value: amount });
+          expect(await core.depositByOwnerByToken(other.address, wrapped.address)).to.eq(1000 + amount);
+          expect(await core.depositByOwnerByToken(wallet.address, wrapped.address)).to.eq(0);
+        });
+      }
     });
   });
 });

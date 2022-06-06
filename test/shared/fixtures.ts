@@ -1,21 +1,9 @@
-import { BigNumber, constants } from "ethers";
+import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { ElvateCore } from "../../typechain/ElvateCore";
-import { ElvatePair } from "../../typechain/ElvatePair";
-import { ElvateSubscription } from "../../typechain/ElvateSubscription";
 import { TestElvateCore } from "../../typechain/TestElvateCore";
 import { TestERC20 } from "../../typechain/TestERC20";
 import { WETH9 } from "../../typechain/WETH9";
-
-interface ElvatePairFixture {
-  pair: ElvatePair;
-}
-
-export async function pairFixture(): Promise<ElvatePairFixture> {
-  const factory = await ethers.getContractFactory("ElvatePair");
-  const pair = (await factory.deploy()) as ElvatePair;
-  return { pair };
-}
 
 interface TokenFixture {
   token0: TestERC20;
@@ -49,24 +37,16 @@ export async function tokenFixture(): Promise<TokenFixture> {
   return { token0, token1, token2 };
 }
 
-interface ElvateSubscriptionFixture {
-  subscription: ElvateSubscription;
-}
-
-export async function subscriptionFixture(): Promise<ElvateSubscriptionFixture> {
-  const factory = await ethers.getContractFactory("ElvateSubscription");
-  const subscription = (await factory.deploy()) as ElvateSubscription;
-
-  return { subscription };
-}
-
 interface ElvateCoreFixture {
   core: ElvateCore;
 }
 
-export async function coreFixture(): Promise<ElvateCoreFixture> {
+export async function coreFixture(
+  router: string,
+  wrapped: string
+): Promise<ElvateCoreFixture> {
   const factory = await ethers.getContractFactory("ElvateCore");
-  const core = (await factory.deploy()) as ElvateCore;
+  const core = (await factory.deploy(router, wrapped)) as ElvateCore;
 
   return { core };
 }
@@ -75,9 +55,12 @@ interface TestElvateCoreFixture {
   testCore: TestElvateCore;
 }
 
-export async function testCoreFixture(): Promise<TestElvateCoreFixture> {
+export async function testCoreFixture(
+  router: string,
+  wrapped: string
+): Promise<TestElvateCoreFixture> {
   const factory = await ethers.getContractFactory("TestElvateCore");
-  const testCore = (await factory.deploy()) as TestElvateCore;
+  const testCore = (await factory.deploy(router, wrapped)) as TestElvateCore;
 
   return { testCore };
 }
@@ -97,27 +80,21 @@ interface AllFixture {
   token0: TestERC20;
   token1: TestERC20;
   token2: TestERC20;
-  pair: ElvatePair;
-  subscription: ElvateSubscription;
   core: ElvateCore;
   testCore: TestElvateCore;
   wrapped: WETH9;
 }
 
-export async function allFixture(): Promise<AllFixture> {
+export async function allFixture(router: string): Promise<AllFixture> {
   const { token0, token1, token2 } = await tokenFixture();
-  const { pair } = await pairFixture();
-  const { subscription } = await subscriptionFixture();
   const { wrapped } = await wrappedFixture();
-  const { testCore } = await testCoreFixture();
-  const { core } = await coreFixture();
+  const { testCore } = await testCoreFixture(router, wrapped.address);
+  const { core } = await coreFixture(router, wrapped.address);
 
   return {
     token0,
     token1,
     token2,
-    pair,
-    subscription,
     core,
     testCore,
     wrapped,

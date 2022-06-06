@@ -12,17 +12,12 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 /// @author aussedatlo
 /// @title manager of pair/subscription trigger
-contract ElvateCore is Ownable, ElvateChest {
+contract ElvateCore is Ownable, ElvateChest, ElvateSubscription {
     using SafeERC20 for IERC20;
 
-    address public routerContractAddress;
-    address public pairContractAddress;
-    address public subscriptionContractAddress;
-    uint128 public precision = 10**15;
-    uint256 public frequency = 60 * 6; // * 24;
+    address public immutable routerContractAddress;
+    uint128 public immutable precision = 10**15;
     uint16 public swapFee = 5;
-
-    mapping(address => mapping(address => uint256)) public depositByUserByToken;
 
     event PairTriggered(
         uint256 indexed pairId,
@@ -33,58 +28,41 @@ contract ElvateCore is Ownable, ElvateChest {
         uint256 fees
     );
 
-    /// @dev update of contracts addresses that interact with this one
+    /// @dev constructor
     /// @param _routerContractAddress uniswap router contract address
-    /// @param _pairContractAddress elvate pair contract address
-    /// @param _subscriptionContractAddress elvate subscription contract address
     /// @param _wrappedContractAddress wrapped token contract address
-    function updateContractAddresses(
-        address _routerContractAddress,
-        address _pairContractAddress,
-        address _subscriptionContractAddress,
-        address _wrappedContractAddress
-    ) external onlyOwner {
+    constructor(address _routerContractAddress, address _wrappedContractAddress) ElvateChest(_wrappedContractAddress) {
         routerContractAddress = _routerContractAddress;
-        pairContractAddress = _pairContractAddress;
-        subscriptionContractAddress = _subscriptionContractAddress;
-        wrappedContractAddress = _wrappedContractAddress;
     }
 
-    function trigger(address _tokenIn, address _tokenOut) external {
+    function triggerPair(address _tokenIn, address _tokenOut) external {
         uint256[] memory eligibleSubscriptions;
         uint256 totalAmountIn;
         uint256 eligibleSubscriptionsLength;
         address[] memory path = _getPath(_tokenIn, _tokenOut);
         uint256[] memory swapResult;
-        ElvatePair(pairContractAddress).trigger(_tokenIn, _tokenOut);
-        (
-            eligibleSubscriptions,
-            totalAmountIn,
-            eligibleSubscriptionsLength
-        ) = getEligibleSubscription(_tokenIn, _tokenOut);
+        _trigger(_tokenIn, _tokenOut);
 
-        require(eligibleSubscriptionsLength > 0, "No eligible subscriptions");
-        require(
-            IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn),
-            "approve failed"
-        );
-
-        uint256[] memory amounts = IUniswapV2Router02(routerContractAddress)
-            .getAmountsOut(totalAmountIn, path);
-
-        swapResult = IUniswapV2Router02(routerContractAddress)
-            .swapExactTokensForTokens(
-                totalAmountIn,
-                amounts[amounts.length - 1],
-                path,
-                address(this),
-                block.timestamp + 10000
-            );
-
-        uint256 totalAmountOut = _deductFees(
-            swapResult[swapResult.length - 1],
+        (eligibleSubscriptions, totalAmountIn, eligibleSubscriptionsLength) = getEligibleSubscription(
+            _tokenIn,
             _tokenOut
         );
+
+        require(eligibleSubscriptionsLength > 0, "No eligible subscriptions");
+        require(IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn), "approve failed");
+        require(totalAmountIn > 0, "Nothing to buy");
+
+        uint256[] memory amounts = IUniswapV2Router02(routerContractAddress).getAmountsOut(totalAmountIn, path);
+
+        swapResult = IUniswapV2Router02(routerContractAddress).swapExactTokensForTokens(
+            totalAmountIn,
+            amounts[amounts.length - 1],
+            path,
+            address(this),
+            block.timestamp + 10000
+        );
+
+        uint256 totalAmountOut = _deductFees(swapResult[swapResult.length - 1], _tokenOut);
 
         // distribute token to users
         _distributeSwap(
@@ -94,6 +72,15 @@ contract ElvateCore is Ownable, ElvateChest {
             eligibleSubscriptionsLength,
             totalAmountIn,
             totalAmountOut
+        );
+
+        emit PairTriggered(
+            pairIdByTokenInOut[_tokenIn][_tokenOut],
+            block.timestamp,
+            eligibleSubscriptionsLength,
+            totalAmountIn,
+            totalAmountOut,
+            fees
         );
     }
 
@@ -108,30 +95,14 @@ contract ElvateCore is Ownable, ElvateChest {
     {
         uint256 count = 0;
         uint256 totalAmountIn = 0;
-        uint256 pairId = ElvatePair(pairContractAddress).pairIdByTokenInOut(
-            _tokenIn,
-            _tokenOut
-        );
+        uint256 pairId = pairIdByTokenInOut[_tokenIn][_tokenOut];
 
-        ElvatePair.Pair[] memory allPairs = ElvatePair(pairContractAddress)
-            .getAllPairs();
-
-        ElvateSubscription.Subscription[]
-            memory allSubscriptions = ElvateSubscription(
-                subscriptionContractAddress
-            ).getAllSubscriptions();
-
-        uint256[] memory eligibleSubscriptions = new uint256[](
-            allSubscriptions.length
-        );
+        uint256[] memory eligibleSubscriptions = new uint256[](allSubscriptions.length);
 
         for (uint256 index = 0; index < allSubscriptions.length; index++) {
             if (
                 allSubscriptions[index].pairId == pairId &&
-                getDepositedToken(
-                    allSubscriptions[index].owner,
-                    allPairs[pairId - 1].tokenIn
-                ) >=
+                depositByOwnerByToken[allSubscriptions[index].owner][allPairs[pairId - 1].tokenIn] >=
                 allSubscriptions[index].amountIn
             ) {
                 eligibleSubscriptions[count] = index;
@@ -143,15 +114,8 @@ contract ElvateCore is Ownable, ElvateChest {
         return (eligibleSubscriptions, totalAmountIn, count);
     }
 
-    function _getPath(address _tokenIn, address _tokenOut)
-        internal
-        view
-        returns (address[] memory)
-    {
-        if (
-            _tokenIn != wrappedContractAddress &&
-            _tokenOut != wrappedContractAddress
-        ) {
+    function _getPath(address _tokenIn, address _tokenOut) internal view returns (address[] memory) {
+        if (_tokenIn != wrappedContractAddress && _tokenOut != wrappedContractAddress) {
             address[] memory pathWithWBNB = new address[](3);
             pathWithWBNB[0] = _tokenIn;
             pathWithWBNB[1] = wrappedContractAddress;
@@ -182,46 +146,32 @@ contract ElvateCore is Ownable, ElvateChest {
     ) internal {
         uint256 totalAmountOutDistributed = 0;
         for (uint256 index = 0; index < eligibleSubscriptionsLength; index++) {
-            (uint256 amountIn, , address owner) = ElvateSubscription(
-                subscriptionContractAddress
-            ).allSubscriptions(_eligibleSubscriptions[index]);
-            // substract tokenIn from user deposit based on subscription
+            Subscription memory subscription = allSubscriptions[_eligibleSubscriptions[index]];
 
-            require(
-                depositByOwnerByToken[owner][_tokenIn] >= amountIn,
-                "Error1"
-            );
-            depositByOwnerByToken[owner][_tokenIn] -= amountIn;
+            depositByOwnerByToken[subscription.owner][_tokenIn] -= subscription.amountIn;
 
             // weight of subscription
-            require(_totalAmountIn > 0, "Error2");
-            uint256 weight = (amountIn * precision) / _totalAmountIn;
+            uint256 weight = (subscription.amountIn * precision) / _totalAmountIn;
 
             // add amountOut to user based on weight of subscription
-            require(precision > 0, "Error3");
             uint256 amountOut = (_totalAmountOut * weight) / precision;
 
-            depositByOwnerByToken[owner][_tokenOut] += amountOut;
+            depositByOwnerByToken[subscription.owner][_tokenOut] += amountOut;
 
             // keep track of all amountOut
             totalAmountOutDistributed += amountOut;
         }
 
         // keep the small pieces
-        require(_totalAmountOut >= totalAmountOutDistributed, "Error4");
-        depositByOwnerByToken[address(this)][_tokenOut] +=
-            _totalAmountOut -
-            totalAmountOutDistributed;
+        require(_totalAmountOut >= totalAmountOutDistributed, "Invalid distribution");
+        depositByOwnerByToken[address(this)][_tokenOut] += _totalAmountOut - totalAmountOutDistributed;
     }
 
     /// @dev deduct fees and distribute them to contract and sender
     /// @param _totalAmountOut total amount of token purchased
     /// @param _tokenOut address of token out
     /// @return Total aamount out after fees
-    function _deductFees(uint256 _totalAmountOut, address _tokenOut)
-        internal
-        returns (uint256)
-    {
+    function _deductFees(uint256 _totalAmountOut, address _tokenOut) internal returns (uint256) {
         uint256 fees = (_totalAmountOut * swapFee) / 10000;
 
         // Take one part for contract

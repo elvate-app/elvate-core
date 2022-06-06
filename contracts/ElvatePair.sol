@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @author aussedatlo
 /// @title Elvate Pair
-contract ElvatePair is Ownable {
+abstract contract ElvatePair is Ownable {
     /// pair struct
     struct Pair {
         uint256 id;
@@ -20,15 +20,11 @@ contract ElvatePair is Ownable {
     uint128 public fees = 0.1 ether;
     /// frequency
     uint16 public frequency = 60 * 6;
-    /// pair manager
-    address public coreContractAddress;
     /// pair by tokenIn tokenOut
     mapping(address => mapping(address => uint256)) public pairIdByTokenInOut;
 
     // Event triggered when a pair is created
     event PairCreated(uint256 _id, address _tokenIn, address _tokenOut);
-    // Event triggered when a pair is triggered
-    event PairTriggered(uint256 indexed pairId, uint256 lastPaidAt);
 
     /// @dev verify if pair doesn't exist
     /// @param _tokenIn address of input token
@@ -91,17 +87,11 @@ contract ElvatePair is Ownable {
         fees = _fees;
     }
 
-    /// @dev update manager address
-    /// @param _coreContractAddress value of fees to update
-    function updateAddress(address _coreContractAddress) external onlyOwner {
-        coreContractAddress = _coreContractAddress;
-    }
-
     /// @dev update lastPaidAt of specific pair
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
-    function trigger(address _tokenIn, address _tokenOut)
-        external
+    function _trigger(address _tokenIn, address _tokenOut)
+        internal
         onlyExistingPair(_tokenIn, _tokenOut)
     {
         require(
@@ -110,14 +100,8 @@ contract ElvatePair is Ownable {
                 block.timestamp,
             "Unable to trigger right now"
         );
-        require(msg.sender == coreContractAddress, "Caller is not the manager");
 
         allPairs[pairIdByTokenInOut[_tokenIn][_tokenOut] - 1].lastPaidAt = block
             .timestamp;
-
-        emit PairTriggered(
-            pairIdByTokenInOut[_tokenIn][_tokenOut],
-            allPairs[pairIdByTokenInOut[_tokenIn][_tokenOut] - 1].lastPaidAt
-        );
     }
 }

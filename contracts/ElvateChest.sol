@@ -9,25 +9,20 @@ abstract contract ElvateChest {
     using SafeERC20 for IERC20;
 
     /// address of wrapped token
-    address public wrappedContractAddress;
+    address public immutable wrappedContractAddress;
 
     /// mapping of deposit by owner address and token address
-    mapping(address => mapping(address => uint256))
-        public depositByOwnerByToken;
+    mapping(address => mapping(address => uint256)) public depositByOwnerByToken;
 
     /// event for deposit
-    event TokenDeposited(
-        address indexed _owner,
-        address indexed _token,
-        uint256 _amount
-    );
+    event TokenDeposited(address indexed _owner, address indexed _token, uint256 _amount);
 
     /// event for withdrawal
-    event TokenWithdrawal(
-        address indexed _owner,
-        address indexed _token,
-        uint256 _amount
-    );
+    event TokenWithdrawal(address indexed _owner, address indexed _token, uint256 _amount);
+
+    constructor(address _wrappedContractAddress) {
+        wrappedContractAddress = _wrappedContractAddress;
+    }
 
     /// @dev deposit token to the contract
     /// @param _token address of token to deposit
@@ -42,20 +37,10 @@ abstract contract ElvateChest {
     /// @param _token address of token to withdraw
     /// @param _amount amount of token to withdraw
     function withdrawToken(address _token, uint256 _amount) external {
-        IERC20(_token).safeTransfer(msg.sender, _amount);
+        require(depositByOwnerByToken[msg.sender][_token] >= _amount, "Not enought deposit");
         depositByOwnerByToken[msg.sender][_token] -= _amount;
+        IERC20(_token).safeTransfer(msg.sender, _amount);
         emit TokenWithdrawal(msg.sender, _token, _amount);
-    }
-
-    /// @dev get token deposited to the platform for specific user
-    /// @param _owner address of owner to check deposit
-    /// @param _token address of token to check deposit
-    function getDepositedToken(address _owner, address _token)
-        public
-        view
-        returns (uint256)
-    {
-        return depositByOwnerByToken[_owner][_token];
     }
 
     /// @dev deposit token and automatically wrap them

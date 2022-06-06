@@ -6,6 +6,10 @@ import "../ElvateCore.sol";
 /// @author aussedatlo
 /// @title manager of pair/subscription trigger
 contract TestElvateCore is ElvateCore {
+    constructor(address _routerContractAddress, address _wrappedContractAddress)
+        ElvateCore(_routerContractAddress, _wrappedContractAddress)
+    {}
+
     function getPath(address _tokenIn, address _tokenOut)
         public
         view
@@ -37,5 +41,9 @@ contract TestElvateCore is ElvateCore {
         returns (uint256)
     {
         return _deductFees(_totalAmountOut, _tokenOut);
+    }
+
+    function trigger(address _tokenIn, address _tokenOut) external {
+        _trigger(_tokenIn, _tokenOut);
     }
 }

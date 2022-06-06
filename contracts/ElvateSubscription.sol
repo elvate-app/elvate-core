@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @author aussedatlo
 /// @title manager of Pair Subscriptions
-contract ElvateSubscription is Ownable {
+abstract contract ElvateSubscription is Ownable, ElvatePair {
     /// subscription structure
     struct Subscription {
         uint256 amountIn;
@@ -22,8 +22,6 @@ contract ElvateSubscription is Ownable {
     /// subscriptions id token in and token out
     mapping(address => mapping(address => mapping(address => uint256)))
         public subscriptionIdByOwnerTokenInTokenOut;
-    /// elvate pair contract address
-    address public pairContractAddress;
 
     /// @dev subscribe to a pair
     /// @param _tokenIn address of tokenIn
@@ -35,7 +33,7 @@ contract ElvateSubscription is Ownable {
         address _tokenOut,
         uint256 _amountIn
     ) external {
-        uint256 pairId = _getElvatePairId(_tokenIn, _tokenOut);
+        uint256 pairId = pairIdByTokenInOut[_tokenIn][_tokenOut];
         require(pairId > 0, "Invalid pair");
 
         if (
@@ -74,26 +72,5 @@ contract ElvateSubscription is Ownable {
     /// @return array of all subscriptions
     function getAllSubscriptions() public view returns (Subscription[] memory) {
         return allSubscriptions;
-    }
-
-    /// @dev update ElvatePair contract address
-    /// @param _pairContractAddress new ElvatePair contract address
-    function updateAddress(address _pairContractAddress) external onlyOwner {
-        pairContractAddress = _pairContractAddress;
-    }
-
-    /// @dev get ElvatePair id
-    /// @param _tokenIn address of tokenIn
-    /// @param _tokenOut address of tokenOut
-    function _getElvatePairId(address _tokenIn, address _tokenOut)
-        internal
-        view
-        returns (uint256)
-    {
-        return
-            ElvatePair(pairContractAddress).pairIdByTokenInOut(
-                _tokenIn,
-                _tokenOut
-            );
     }
 }
