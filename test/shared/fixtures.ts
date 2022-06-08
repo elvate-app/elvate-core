@@ -1,9 +1,12 @@
-import { BigNumber } from "ethers";
-import { ethers } from "hardhat";
+import { BigNumber, Signer } from "ethers";
+import { ethers, waffle } from "hardhat";
 import { ElvateCore } from "../../typechain/ElvateCore";
-import { TestElvateCore } from "../../typechain/TestElvateCore";
 import { TestERC20 } from "../../typechain/TestERC20";
 import { WETH9 } from "../../typechain/WETH9";
+import { ISwapRouter } from "../../typechain/ISwapRouter"
+import { MockContract } from "ethereum-waffle";
+
+const deployMockContract = waffle.deployMockContract;
 
 interface TokenFixture {
   token0: TestERC20;
@@ -51,20 +54,6 @@ export async function coreFixture(
   return { core };
 }
 
-interface TestElvateCoreFixture {
-  testCore: TestElvateCore;
-}
-
-export async function testCoreFixture(
-  router: string,
-  wrapped: string
-): Promise<TestElvateCoreFixture> {
-  const factory = await ethers.getContractFactory("TestElvateCore");
-  const testCore = (await factory.deploy(router, wrapped)) as TestElvateCore;
-
-  return { testCore };
-}
-
 interface WrappedFixture {
   wrapped: WETH9;
 }
@@ -76,27 +65,13 @@ export async function wrappedFixture(): Promise<WrappedFixture> {
   return { wrapped };
 }
 
-interface AllFixture {
-  token0: TestERC20;
-  token1: TestERC20;
-  token2: TestERC20;
-  core: ElvateCore;
-  testCore: TestElvateCore;
-  wrapped: WETH9;
+interface routerFixture {
+  router: MockContract
 }
 
-export async function allFixture(router: string): Promise<AllFixture> {
-  const { token0, token1, token2 } = await tokenFixture();
-  const { wrapped } = await wrappedFixture();
-  const { testCore } = await testCoreFixture(router, wrapped.address);
-  const { core } = await coreFixture(router, wrapped.address);
+export async function routerFixture(signer: Signer): Promise<any> {
+  const router = require("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
+  const mockedRouter = await deployMockContract(signer, router.abi);
 
-  return {
-    token0,
-    token1,
-    token2,
-    core,
-    testCore,
-    wrapped,
-  };
+  return {router: mockedRouter}
 }

@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "./ElvateSubscription.sol";
 import "./ElvatePair.sol";
 import "./ElvateChest.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 /// @author aussedatlo
 /// @title manager of pair/subscription trigger
-contract ElvateCore is Ownable, ElvateChest, ElvateSubscription {
+contract ElvateCore is ElvateChest, ElvatePair {
     using SafeERC20 for IERC20;
 
     address public immutable routerContractAddress;
     uint128 public immutable precision = 10**15;
-    uint16 public swapFee = 5;
+    uint16 public swapFees = 5;
+    uint24 public constant poolFee = 3000;
 
     event PairTriggered(
         uint256 indexed pairId,
@@ -35,128 +33,130 @@ contract ElvateCore is Ownable, ElvateChest, ElvateSubscription {
         routerContractAddress = _routerContractAddress;
     }
 
+    /// @dev update fees
+    /// @param _swapFees fees applied during swap
+    /// @param _pairCreationFees fees applied during pair creation
+    function updateFees(uint16 _swapFees, uint128 _pairCreationFees) external onlyOwner {
+        swapFees = _swapFees;
+        pairCreationFees = _pairCreationFees;
+    }
+
+    /// @dev trigger a pair
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     function triggerPair(address _tokenIn, address _tokenOut) external {
-        uint256[] memory eligibleSubscriptions;
+        address[] memory eligibleSubs;
+        uint256 swapResult;
         uint256 totalAmountIn;
-        uint256 eligibleSubscriptionsLength;
-        address[] memory path = _getPath(_tokenIn, _tokenOut);
-        uint256[] memory swapResult;
+        uint256 eligibleSubsLength;
         _trigger(_tokenIn, _tokenOut);
 
-        (eligibleSubscriptions, totalAmountIn, eligibleSubscriptionsLength) = getEligibleSubscription(
-            _tokenIn,
-            _tokenOut
-        );
+        (eligibleSubs, totalAmountIn, eligibleSubsLength) = getEligibleSubscription(_tokenIn, _tokenOut);
 
-        require(eligibleSubscriptionsLength > 0, "No eligible subscriptions");
-        require(IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn), "approve failed");
+        require(eligibleSubsLength > 0, "No eligible subscriptions");
+        require(IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn), "Approve failed");
         require(totalAmountIn > 0, "Nothing to buy");
 
-        uint256[] memory amounts = IUniswapV2Router02(routerContractAddress).getAmountsOut(totalAmountIn, path);
+        ISwapRouter.ExactInputParams memory params =
+            ISwapRouter.ExactInputParams({
+                path: _getPath(_tokenIn, _tokenOut),
+                recipient: address(this),
+                deadline: block.timestamp + 200,
+                amountIn: totalAmountIn,
+                amountOutMinimum: 0
+            });
 
-        swapResult = IUniswapV2Router02(routerContractAddress).swapExactTokensForTokens(
-            totalAmountIn,
-            amounts[amounts.length - 1],
-            path,
-            address(this),
-            block.timestamp + 10000
-        );
+        swapResult = ISwapRouter(routerContractAddress).exactInput(params);
 
-        uint256 totalAmountOut = _deductFees(swapResult[swapResult.length - 1], _tokenOut);
+        uint256 totalAmountOut = _deductFees(swapResult, _tokenOut);
 
-        // distribute token to users
-        _distributeSwap(
-            _tokenIn,
-            _tokenOut,
-            eligibleSubscriptions,
-            eligibleSubscriptionsLength,
-            totalAmountIn,
-            totalAmountOut
-        );
+        _distributeSwap(_tokenIn, _tokenOut, eligibleSubs, eligibleSubsLength, totalAmountIn, totalAmountOut);
 
         emit PairTriggered(
             pairIdByTokenInOut[_tokenIn][_tokenOut],
             block.timestamp,
-            eligibleSubscriptionsLength,
+            eligibleSubsLength,
             totalAmountIn,
             totalAmountOut,
-            fees
+            swapFees
         );
     }
 
+    /// @dev get list of all eligible subscriptions for a pair
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output token
     function getEligibleSubscription(address _tokenIn, address _tokenOut)
         public
         view
+        onlyExistingPair(_tokenIn, _tokenOut)
         returns (
-            uint256[] memory,
+            address[] memory,
             uint256,
             uint256
         )
     {
-        uint256 count = 0;
-        uint256 totalAmountIn = 0;
         uint256 pairId = pairIdByTokenInOut[_tokenIn][_tokenOut];
+        address[] memory eligibleSubs = new address[](allPairs[pairId - 1].subs.length);
+        Pair memory pair = allPairs[pairId - 1];
+        uint256 totalAmountIn;
+        uint256 count;
 
-        uint256[] memory eligibleSubscriptions = new uint256[](allSubscriptions.length);
-
-        for (uint256 index = 0; index < allSubscriptions.length; index++) {
+        for (uint256 index; index < pair.subs.length; index++) {
             if (
-                allSubscriptions[index].pairId == pairId &&
-                depositByOwnerByToken[allSubscriptions[index].owner][allPairs[pairId - 1].tokenIn] >=
-                allSubscriptions[index].amountIn
+                depositByOwnerByToken[pair.subs[index]][pair.tokenIn] >=
+                subAmountInByOwnerPairId[pair.subs[index]][pairId]
             ) {
-                eligibleSubscriptions[count] = index;
-                totalAmountIn += allSubscriptions[index].amountIn;
+                eligibleSubs[count] = pair.subs[index];
+                totalAmountIn += subAmountInByOwnerPairId[pair.subs[index]][pairId];
                 count++;
             }
         }
 
-        return (eligibleSubscriptions, totalAmountIn, count);
+        return (eligibleSubs, totalAmountIn, count);
     }
 
-    function _getPath(address _tokenIn, address _tokenOut) internal view returns (address[] memory) {
+    /// @dev deduct fees and distribute them to contract and sender
+    /// @param _tokenIn address of input token
+    /// @param _tokenOut address of output
+    /// @return sequence of token address and pool fees handled by uniswap
+    function _getPath(address _tokenIn, address _tokenOut) internal view returns (bytes memory) {
         if (_tokenIn != wrappedContractAddress && _tokenOut != wrappedContractAddress) {
-            address[] memory pathWithWBNB = new address[](3);
-            pathWithWBNB[0] = _tokenIn;
-            pathWithWBNB[1] = wrappedContractAddress;
-            pathWithWBNB[2] = _tokenOut;
-            return pathWithWBNB;
+            return abi.encodePacked(_tokenIn, poolFee, wrappedContractAddress, poolFee, _tokenOut);
         }
 
-        address[] memory path = new address[](2);
-        path[0] = _tokenIn;
-        path[1] = _tokenOut;
-        return path;
+        return abi.encodePacked(_tokenIn, poolFee, _tokenOut);
     }
 
     /// @dev substract tokenIn based on subscription
     ///      and add tokenOut based on subscription weight
     /// @param _tokenIn address of tokenIn
     /// @param _tokenOut address of tokenOut
-    /// @param _eligibleSubscriptions list of all eligible subscriptions
+    /// @param _eligibleSubs list of all eligible subscriptions
     /// @param _totalAmountIn sum of all amountIn of all eligible subscription
     /// @param _totalAmountOut amount of tokenOut obtained via swap
     function _distributeSwap(
         address _tokenIn,
         address _tokenOut,
-        uint256[] memory _eligibleSubscriptions,
-        uint256 eligibleSubscriptionsLength,
+        address[] memory _eligibleSubs,
+        uint256 _eligibleSubsLength,
         uint256 _totalAmountIn,
         uint256 _totalAmountOut
     ) internal {
-        uint256 totalAmountOutDistributed = 0;
-        for (uint256 index = 0; index < eligibleSubscriptionsLength; index++) {
-            Subscription memory subscription = allSubscriptions[_eligibleSubscriptions[index]];
+        uint256 pairId = pairIdByTokenInOut[_tokenIn][_tokenOut];
+        uint256 totalAmountOutDistributed;
 
-            depositByOwnerByToken[subscription.owner][_tokenIn] -= subscription.amountIn;
+        for (uint256 index; index < _eligibleSubsLength; index++) {
+            depositByOwnerByToken[_eligibleSubs[index]][_tokenIn] -= subAmountInByOwnerPairId[_eligibleSubs[index]][
+                pairId
+            ];
 
-            // weight of subscription
-            uint256 weight = (subscription.amountIn * precision) / _totalAmountIn;
+            // weight of sub
+            uint256 weight = (subAmountInByOwnerPairId[_eligibleSubs[index]][pairId] * precision) / _totalAmountIn;
 
-            // add amountOut to user based on weight of subscription
+            // add amountOut to user based on weight of sub
             uint256 amountOut = (_totalAmountOut * weight) / precision;
 
-            depositByOwnerByToken[subscription.owner][_tokenOut] += amountOut;
+            depositByOwnerByToken[_eligibleSubs[index]][_tokenOut] += amountOut;
 
             // keep track of all amountOut
             totalAmountOutDistributed += amountOut;
@@ -170,9 +170,9 @@ contract ElvateCore is Ownable, ElvateChest, ElvateSubscription {
     /// @dev deduct fees and distribute them to contract and sender
     /// @param _totalAmountOut total amount of token purchased
     /// @param _tokenOut address of token out
-    /// @return Total aamount out after fees
+    /// @return Total amount out after fees
     function _deductFees(uint256 _totalAmountOut, address _tokenOut) internal returns (uint256) {
-        uint256 fees = (_totalAmountOut * swapFee) / 10000;
+        uint256 fees = (_totalAmountOut * swapFees) / 10000;
 
         // Take one part for contract
         depositByOwnerByToken[address(this)][_tokenOut] += fees;

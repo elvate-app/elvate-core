@@ -2,10 +2,11 @@
 pragma solidity ^0.8.0;
 
 import "./libs/IWETH9.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-abstract contract ElvateChest {
+abstract contract ElvateChest is Ownable {
     using SafeERC20 for IERC20;
 
     /// address of wrapped token
@@ -20,6 +21,8 @@ abstract contract ElvateChest {
     /// event for withdrawal
     event TokenWithdrawal(address indexed _owner, address indexed _token, uint256 _amount);
 
+    /// @dev constructor
+    /// @param _wrappedContractAddress address of wrapped token
     constructor(address _wrappedContractAddress) {
         wrappedContractAddress = _wrappedContractAddress;
     }
@@ -33,7 +36,7 @@ abstract contract ElvateChest {
         emit TokenDeposited(msg.sender, _token, _amount);
     }
 
-    /// @dev withdraw token to the contract
+    /// @dev withdraw token from the contract
     /// @param _token address of token to withdraw
     /// @param _amount amount of token to withdraw
     function withdrawToken(address _token, uint256 _amount) external {
@@ -48,5 +51,20 @@ abstract contract ElvateChest {
         IWETH9(wrappedContractAddress).deposit{value: msg.value}();
         depositByOwnerByToken[msg.sender][wrappedContractAddress] += msg.value;
         emit TokenDeposited(msg.sender, wrappedContractAddress, msg.value);
+    }
+
+    /// @dev withdraw all specific token fees
+    /// @param _token address of token to withdraw
+    function withdrawTokenFees(address _token) external onlyOwner {
+        uint256 dep = depositByOwnerByToken[address(this)][_token];
+        require(dep > 0, "Nothing to withdraw");
+        IERC20(_token).safeTransfer(msg.sender, dep);
+        depositByOwnerByToken[address(this)][_token] -= dep;
+    }
+
+    /// @dev withdraw all pair creation fees
+    function withdrawFees() external onlyOwner {
+        require(address(this).balance > 0, "Nothing to withdraw");
+        payable(msg.sender).transfer(address(this).balance);
     }
 }

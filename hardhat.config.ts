@@ -5,6 +5,7 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
+import "hardhat-contract-sizer";
 import "solidity-coverage";
 
 dotenv.config();
@@ -27,6 +28,12 @@ const config: HardhatUserConfig = {
     compilers: [
       {
         version: "0.8.1",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 800,
+          },
+        },
       },
     ],
     overrides: {
@@ -39,8 +46,8 @@ const config: HardhatUserConfig = {
   networks: {
     polygon_mumbai: {
       url: process.env.POLYGON_MUMBAI_URL || "",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 35000000000,
     },
   },
   gasReporter: {
@@ -49,7 +56,15 @@ const config: HardhatUserConfig = {
     // gasPriceApi:
     //   "https://api.polygonscan.com/api?module=proxy&action=eth_gasPrice",
     // token: "MATIC",
+    gasPrice: 35,
     coinmarketcap: process.env.CMC_API_KEY,
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
+    only: [':ElvateCore$'],
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
