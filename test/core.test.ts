@@ -43,167 +43,153 @@ describe("Elvate Core", function () {
     expect(await core.wrappedContractAddress()).to.eq(wrapped.address);
   });
 
-  describe("Trigger", () => {
-    it("trigger a pair", async () => {
-      await token0.approve(core.address, constants.MaxUint256);
-      token0.transfer(core.address, 10000);
-      await core.depositToken(token0.address, 100000);
-
+  describe("Eligible subscriptions", () => {
+    beforeEach(async () => {
+      // create 3 pairs
       await core.createPair(token0.address, token1.address);
-      await core.subscribe(token0.address, token1.address, 1000);
-      await router.mock.exactInput.returns(800);
+      await core.createPair(token1.address, token2.address);
+      await core.createPair(token2.address, token0.address);
 
-      await core.triggerPair(token0.address, token1.address);
+      // initialize deposit for all tokens
+      for (const token of [token0, token1, token2]) {
+        await token.transfer(other.address, 10000000);
+        await token.approve(core.address, constants.MaxUint256);
+        await token.connect(other).approve(core.address, constants.MaxUint256);
+        await core.depositToken(token.address, 10000000);
+        await core.connect(other).depositToken(token.address, 10000000);
+      }
+    });
+
+    describe("No subscriptions", () => {
+      it("return no subscription for token0, token1", async () => {
+        const subs = await core.getEligibleSubscription(token0.address, token1.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("return no subscription for token1, token2", async () => {
+        const subs = await core.getEligibleSubscription(token1.address, token2.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("return no subscription for token2, token0", async () => {
+        const subs = await core.getEligibleSubscription(token2.address, token0.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("revert for invalid pair", async () => {
+        await expect(core.getEligibleSubscription(token1.address, token0.address)).to.reverted;
+      });
+    });
+
+    describe("One subscription to token0, token1", () => {
+      beforeEach(async () => {
+        await core.connect(other).subscribe(token0.address, token1.address, 50);
+      });
+
+      it("return only one subscription for token0, token1", async function () {
+        const subs = await core.getEligibleSubscription(token0.address, token1.address);
+        expect(subs[0].length).to.eq(1);
+        expect(subs[0][0]).to.eq(other.address);
+        expect(subs[1]).to.eq(50);
+        expect(subs[2]).to.eq(1);
+      });
+
+      it("return no subscriptions for token1, token2", async function () {
+        const subs = await core.getEligibleSubscription(token1.address, token2.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("return no subscriptions for token2, token0", async function () {
+        const subs = await core.getEligibleSubscription(token1.address, token2.address);
+        expect(subs[0].length).to.eq(0);
+        expect(subs[1]).to.eq(0);
+        expect(subs[2]).to.eq(0);
+      });
+
+      it("revert for invalid pair", async () => {
+        await expect(core.getEligibleSubscription(token1.address, token0.address)).to.reverted;
+      });
+    });
+
+    describe("One subscription with max deposit value to token0, token1", () => {
+      beforeEach(async () => {
+        await core.connect(other).subscribe(token0.address, token1.address, 10000000);
+      });
+
+      it("return only one subscription for token0, token1", async function () {
+        const subs = await core.getEligibleSubscription(token0.address, token1.address);
+        expect(subs[0].length).to.eq(1);
+        expect(subs[0][0]).to.eq(other.address);
+        expect(subs[1]).to.eq(10000000);
+        expect(subs[2]).to.eq(1);
+      });
+    });
+
+    describe("Multiple subscriptions to token0, token1", () => {
+      beforeEach(async () => {
+        await core.subscribe(token0.address, token1.address, 50);
+      });
+
+      describe("With 2 valid subscriptions", () => {
+        beforeEach("Subscribe other to token0, token1", async () => {
+          await core.connect(other).subscribe(token0.address, token1.address, 180);
+        });
+
+        it("return two valid subscriptions to token0, token1", async () => {
+          const subs = await core.getEligibleSubscription(token0.address, token1.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(wallet.address);
+          expect(subs[0][1]).to.eq(other.address);
+          expect(subs[1]).to.eq(230);
+          expect(subs[2]).to.eq(2);
+        });
+
+        it("return no valid subscriptions to token1, token2", async () => {
+          const subs = await core.getEligibleSubscription(token1.address, token2.address);
+          // 0 Subs for token1, token2
+          expect(subs[0].length).to.eq(0);
+          expect(subs[1]).to.eq(0);
+          expect(subs[2]).to.eq(0);
+        });
+
+        it("revert for invalid pair", async () => {
+          await expect(core.getEligibleSubscription(token1.address, token0.address)).to.revertedWith("No pair found");
+        });
+      });
+
+      describe("With one valid and one invalid subscriptions", () => {
+        beforeEach("Subscribe other to token0, token1", async () => {
+          await core.connect(other).subscribe(token0.address, token1.address, 10000001);
+        });
+
+        it("return one valid subscriptions to token0, token1", async () => {
+          const subs = await core.getEligibleSubscription(token0.address, token1.address);
+          expect(subs[0].length).to.eq(2);
+          expect(subs[0][0]).to.eq(wallet.address);
+          expect(subs[0][1]).to.eq(constants.AddressZero);
+          expect(subs[1]).to.eq(50);
+          expect(subs[2]).to.eq(1);
+        });
+
+        it("return no valid subscriptions to token1, token2", async () => {
+          const subs = await core.getEligibleSubscription(token1.address, token2.address);
+          expect(subs[0].length).to.eq(0);
+          expect(subs[1]).to.eq(0);
+          expect(subs[2]).to.eq(0);
+        });
+
+        it("revert for invalid pair", async () => {
+          await expect(core.getEligibleSubscription(token1.address, token0.address)).to.revertedWith("No pair found");
+        });
+      });
     });
   });
-
-  // describe("Eligible subscriptions", () => {
-  //   beforeEach(async () => {
-  //     // create 3 pairs
-  //     await core.createPair(token0.address, token1.address);
-  //     await core.createPair(token1.address, token2.address);
-  //     await core.createPair(token2.address, token0.address);
-
-  //     // initialize deposit for all tokens
-  //     for (const token of [token0, token1, token2]) {
-  //       await token.transfer(other.address, 10000000);
-  //       await token.approve(core.address, constants.MaxUint256);
-  //       await token.connect(other).approve(core.address, constants.MaxUint256);
-  //       await core.depositToken(token.address, 10000000);
-  //       await core.connect(other).depositToken(token.address, 10000000);
-  //     }
-  //   });
-
-  //   describe("No subscriptions", () => {
-  //     it("return no subscription for token0, token1", async () => {
-  //       const subs = await core.getEligibleSubscription(token0.address, token1.address);
-  //       expect(subs[0].length).to.eq(0);
-  //       expect(subs[1]).to.eq(0);
-  //       expect(subs[2]).to.eq(0);
-  //     });
-
-  //     it("return no subscription for token1, token2", async () => {
-  //       const subs = await core.getEligibleSubscription(token1.address, token2.address);
-  //       expect(subs[0].length).to.eq(0);
-  //       expect(subs[1]).to.eq(0);
-  //       expect(subs[2]).to.eq(0);
-  //     });
-
-  //     it("return no subscription for token2, token0", async () => {
-  //       const subs = await core.getEligibleSubscription(token2.address, token0.address);
-  //       expect(subs[0].length).to.eq(0);
-  //       expect(subs[1]).to.eq(0);
-  //       expect(subs[2]).to.eq(0);
-  //     });
-
-  //     it("revert for invalid pair", async () => {
-  //       await expect(core.getEligibleSubscription(token1.address, token0.address)).to.reverted;
-  //     });
-  //   });
-
-  //   describe("One subscription to token0, token1", () => {
-  //     beforeEach(async () => {
-  //       await core.connect(other).subscribe(token0.address, token1.address, 50);
-  //     });
-
-  //     it("return only one subscription for token0, token1", async function () {
-  //       const subs = await core.getEligibleSubscription(token0.address, token1.address);
-  //       expect(subs[0].length).to.eq(1);
-  //       expect(subs[0][0]).to.eq(other.address);
-  //       expect(subs[1]).to.eq(50);
-  //       expect(subs[2]).to.eq(1);
-  //     });
-
-  //     it("return no subscriptions for token1, token2", async function () {
-  //       const subs = await core.getEligibleSubscription(token1.address, token2.address);
-  //       expect(subs[0].length).to.eq(0);
-  //       expect(subs[1]).to.eq(0);
-  //       expect(subs[2]).to.eq(0);
-  //     });
-
-  //     it("return no subscriptions for token2, token0", async function () {
-  //       const subs = await core.getEligibleSubscription(token1.address, token2.address);
-  //       expect(subs[0].length).to.eq(0);
-  //       expect(subs[1]).to.eq(0);
-  //       expect(subs[2]).to.eq(0);
-  //     });
-
-  //     it("revert for invalid pair", async () => {
-  //       await expect(core.getEligibleSubscription(token1.address, token0.address)).to.reverted;
-  //     });
-  //   });
-
-  //   describe("One subscription with max deposit value to token0, token1", () => {
-  //     beforeEach(async () => {
-  //       await core.connect(other).subscribe(token0.address, token1.address, 10000000);
-  //     });
-
-  //     it("return only one subscription for token0, token1", async function () {
-  //       const subs = await core.getEligibleSubscription(token0.address, token1.address);
-  //       expect(subs[0].length).to.eq(1);
-  //       expect(subs[0][0]).to.eq(other.address);
-  //       expect(subs[1]).to.eq(10000000);
-  //       expect(subs[2]).to.eq(1);
-  //     });
-  //   });
-
-  //   describe("Multiple subscriptions to token0, token1", () => {
-  //     beforeEach(async () => {
-  //       await core.subscribe(token0.address, token1.address, 50);
-  //     });
-
-  //     describe("With 2 valid subscriptions", () => {
-  //       beforeEach("Subscribe other to token0, token1", async () => {
-  //         await core.connect(other).subscribe(token0.address, token1.address, 180);
-  //       });
-
-  //       it("return two valid subscriptions to token0, token1", async () => {
-  //         const subs = await core.getEligibleSubscription(token0.address, token1.address);
-  //         expect(subs[0].length).to.eq(2);
-  //         expect(subs[0][0]).to.eq(wallet.address);
-  //         expect(subs[0][1]).to.eq(other.address);
-  //         expect(subs[1]).to.eq(230);
-  //         expect(subs[2]).to.eq(2);
-  //       });
-
-  //       it("return no valid subscriptions to token1, token2", async () => {
-  //         const subs = await core.getEligibleSubscription(token1.address, token2.address);
-  //         // 0 Subs for token1, token2
-  //         expect(subs[0].length).to.eq(0);
-  //         expect(subs[1]).to.eq(0);
-  //         expect(subs[2]).to.eq(0);
-  //       });
-
-  //       it("revert for invalid pair", async () => {
-  //         await expect(core.getEligibleSubscription(token1.address, token0.address)).to.revertedWith("No pair found");
-  //       });
-  //     });
-
-  //     describe("With one valid and one invalid subscriptions", () => {
-  //       beforeEach("Subscribe other to token0, token1", async () => {
-  //         await core.connect(other).subscribe(token0.address, token1.address, 10000001);
-  //       });
-
-  //       it("return one valid subscriptions to token0, token1", async () => {
-  //         const subs = await core.getEligibleSubscription(token0.address, token1.address);
-  //         expect(subs[0].length).to.eq(2);
-  //         expect(subs[0][0]).to.eq(wallet.address);
-  //         expect(subs[0][1]).to.eq(constants.AddressZero);
-  //         expect(subs[1]).to.eq(50);
-  //         expect(subs[2]).to.eq(1);
-  //       });
-
-  //       it("return no valid subscriptions to token1, token2", async () => {
-  //         const subs = await core.getEligibleSubscription(token1.address, token2.address);
-  //         expect(subs[0].length).to.eq(0);
-  //         expect(subs[1]).to.eq(0);
-  //         expect(subs[2]).to.eq(0);
-  //       });
-
-  //       it("revert for invalid pair", async () => {
-  //         await expect(core.getEligibleSubscription(token1.address, token0.address)).to.revertedWith("No pair found");
-  //       });
-  //     });
-  //   });
-  // });
 });
