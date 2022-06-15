@@ -6,7 +6,7 @@ async function main() {
 
   const coreFactory = await ethers.getContractFactory("ElvateCore");
   const core = (await coreFactory.deploy(
-    "0x8954AfA98594b838bda56FE4C12a09D7739D179b",
+    "0xE592427A0AEce92De3Edee1F18E0157C05861564",
     "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"
   )) as ElvateCore;
   await core.deployed();
