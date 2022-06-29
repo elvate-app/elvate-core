@@ -4,7 +4,6 @@ import { constants, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 import { beforeEach } from "mocha";
 import { ElvateCore } from "../typechain/ElvateCore";
-import { ISwapRouter } from "../typechain/ISwapRouter";
 import { TestERC20 } from "../typechain/TestERC20";
 import { WETH9 } from "../typechain/WETH9";
 import { coreFixture, routerFixture, tokenFixture, wrappedFixture } from "./shared/fixtures";
