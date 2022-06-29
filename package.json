@@ -1,5 +1,31 @@
 {
-  "name": "elvate-core",
+  "name": "@elvate/v1-core",
+  "version": "0.1.0",
+  "description": "core contracts for elvate app",
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://elvate.io",
+  "keywords": [
+    "elvate",
+    "core",
+    "beta"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elvate-app/elvate-core"
+  },
+  "license": "GPL-3.0-or-later",
+  "files": [
+    "contracts/interfaces",
+    "contracts/libs",
+    "contracts/*.sol",
+    "artifacts/contracts/ElvateCore.sol/ElvateCore.json",
+    "artifacts/contracts/interfaces/IElvateCore/IElvateCore.json"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
   "scripts": {
     "compile": "npx hardhat compile",
     "build": "npx hardhat build",
