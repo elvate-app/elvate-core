@@ -57,14 +57,13 @@ contract ElvateCore is ElvateChest, ElvatePair {
         require(IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn), "Approve failed");
         require(totalAmountIn > 0, "Nothing to buy");
 
-        ISwapRouter.ExactInputParams memory params =
-            ISwapRouter.ExactInputParams({
-                path: _getPath(_tokenIn, _tokenOut),
-                recipient: address(this),
-                deadline: block.timestamp + 200,
-                amountIn: totalAmountIn,
-                amountOutMinimum: 0
-            });
+        ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
+            path: _getPath(_tokenIn, _tokenOut),
+            recipient: address(this),
+            deadline: block.timestamp + 200,
+            amountIn: totalAmountIn,
+            amountOutMinimum: 0
+        });
 
         swapResult = ISwapRouter(routerContractAddress).exactInput(params);
 
