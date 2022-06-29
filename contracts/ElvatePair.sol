@@ -57,11 +57,7 @@ abstract contract ElvatePair is Ownable {
     /// @dev create pair
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
-    function createPair(address _tokenIn, address _tokenOut)
-        external
-        payable
-        onlyNonExistingPair(_tokenIn, _tokenOut)
-    {
+    function createPair(address _tokenIn, address _tokenOut) external payable onlyNonExistingPair(_tokenIn, _tokenOut) {
         require(_tokenIn != _tokenOut, "Tokens cannot be identical");
         if (msg.sender != owner()) {
             require(msg.value >= pairCreationFees, "Insufficient fees");
@@ -148,10 +144,7 @@ abstract contract ElvatePair is Ownable {
     /// @param _tokenOut address of output token
     function _trigger(address _tokenIn, address _tokenOut) internal onlyExistingPair(_tokenIn, _tokenOut) {
         Pair storage pair = allPairs[pairIdByTokenInOut[_tokenIn][_tokenOut] - 1];
-        require(
-            pair.lastPaidAt + frequency < block.timestamp,
-            "Unable to trigger right now"
-        );
+        require(pair.lastPaidAt + frequency < block.timestamp, "Unable to trigger right now");
 
         pair.lastPaidAt = block.timestamp;
     }
