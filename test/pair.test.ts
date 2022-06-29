@@ -53,7 +53,7 @@ describe("Elvate Pairs", function () {
         [],
       ]);
       expect(await core.allPairs(0)).to.eql([BigNumber.from(1), BigNumber.from(1), token0.address, token1.address]);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([]);
     });
 
     it("return correct pair with multiple creation", async () => {
@@ -84,9 +84,9 @@ describe("Elvate Pairs", function () {
       expect(await core.allPairs(0)).to.eql([BigNumber.from(1), BigNumber.from(1), token0.address, token1.address]);
       expect(await core.allPairs(1)).to.eql([BigNumber.from(2), BigNumber.from(1), token1.address, token2.address]);
       expect(await core.allPairs(2)).to.eql([BigNumber.from(3), BigNumber.from(1), token2.address, token0.address]);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([]);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
 
     it("revert on already existing pair", async () => {

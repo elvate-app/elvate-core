@@ -42,9 +42,9 @@ describe("Elvate Subscriptions", function () {
       expect(allPairs[0].subs.length).to.eq(0);
       expect(allPairs[1].subs.length).to.eq(0);
       expect(allPairs[2].subs.length).to.eq(0);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([]);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
   });
 
@@ -69,7 +69,7 @@ describe("Elvate Subscriptions", function () {
     it("return correct subscription address for token0, token1", async () => {
       expect((await core.getPairs())[0].subs.length).to.eq(1);
       expect((await core.getPairs())[0].subs[0]).to.eq(wallet.address);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([[BigNumber.from(50), wallet.address]]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([[BigNumber.from(50), wallet.address]]);
     });
 
     it("return correct value of subscriptions for non subscribed pairs", async () => {
@@ -80,8 +80,8 @@ describe("Elvate Subscriptions", function () {
     it("return no subscriptions for other pairs", async () => {
       expect((await core.getPairs())[1].subs.length).to.eq(0);
       expect((await core.getPairs())[2].subs.length).to.eq(0);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
 
     it("revert with no valid pair", async () => {
@@ -123,7 +123,7 @@ describe("Elvate Subscriptions", function () {
     it("return correct subscription address for token0, token1", async () => {
       expect((await core.getPairs())[0].subs.length).to.eq(1);
       expect((await core.getPairs())[0].subs[0]).to.eq(wallet.address);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([[BigNumber.from(200), wallet.address]]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([[BigNumber.from(200), wallet.address]]);
     });
 
     it("return correct value of subscriptions for non subscribed pairs", async () => {
@@ -134,8 +134,8 @@ describe("Elvate Subscriptions", function () {
     it("return no subscriptions for other pairs", async () => {
       expect((await core.getPairs())[1].subs.length).to.eq(0);
       expect((await core.getPairs())[2].subs.length).to.eq(0);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
 
     it("revert with no valid pair", async () => {
@@ -169,9 +169,9 @@ describe("Elvate Subscriptions", function () {
       expect((await core.getPairs())[0].subs.length).to.eq(0);
       expect((await core.getPairs())[1].subs.length).to.eq(0);
       expect((await core.getPairs())[2].subs.length).to.eq(0);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([]);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
 
     it("revert with other pair", async () => {
@@ -240,12 +240,12 @@ describe("Elvate Subscriptions", function () {
       expect((await core.getPairs())[2].subs.length).to.eq(0);
       expect((await core.getPairs())[1].subs[0]).to.eq(wallet.address);
       expect((await core.getPairs())[1].subs[1]).to.eq(other.address);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([[BigNumber.from(100), wallet.address]]);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([[BigNumber.from(100), wallet.address]]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([
         [BigNumber.from(200), wallet.address],
         [BigNumber.from(20), other.address],
       ]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
 
     it("return correct value with subscription to token2, token0", async () => {
@@ -256,9 +256,9 @@ describe("Elvate Subscriptions", function () {
       expect((await core.getPairs())[0].subs.length).to.eq(1);
       expect((await core.getPairs())[1].subs.length).to.eq(1);
       expect((await core.getPairs())[2].subs.length).to.eq(1);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([[BigNumber.from(100), wallet.address]]);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([[BigNumber.from(200), wallet.address]]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([[BigNumber.from(20), other.address]]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([[BigNumber.from(100), wallet.address]]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([[BigNumber.from(200), wallet.address]]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([[BigNumber.from(20), other.address]]);
     });
 
     it("return correct value with unsubscription to token0, token1", async () => {
@@ -270,9 +270,9 @@ describe("Elvate Subscriptions", function () {
       expect((await core.getPairs())[0].subs.length).to.eq(1);
       expect((await core.getPairs())[1].subs.length).to.eq(1);
       expect((await core.getPairs())[2].subs.length).to.eq(0);
-      expect(await core.getPairSubs(token0.address, token1.address)).to.eql([[BigNumber.from(100), wallet.address]]);
-      expect(await core.getPairSubs(token1.address, token2.address)).to.eql([[BigNumber.from(200), wallet.address]]);
-      expect(await core.getPairSubs(token2.address, token0.address)).to.eql([]);
+      expect(await core.getSubs(token0.address, token1.address)).to.eql([[BigNumber.from(100), wallet.address]]);
+      expect(await core.getSubs(token1.address, token2.address)).to.eql([[BigNumber.from(200), wallet.address]]);
+      expect(await core.getSubs(token2.address, token0.address)).to.eql([]);
     });
   });
 });

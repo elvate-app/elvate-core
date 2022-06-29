@@ -122,7 +122,7 @@ abstract contract ElvatePair is Ownable {
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
     /// @return array of all subs of a pair
-    function getPairSubs(address _tokenIn, address _tokenOut)
+    function getSubs(address _tokenIn, address _tokenOut)
         public
         view
         onlyExistingPair(_tokenIn, _tokenOut)
