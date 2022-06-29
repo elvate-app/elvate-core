@@ -178,7 +178,7 @@ contract ElvateCore is ElvateChest, ElvatePair {
         depositByOwnerByToken[address(this)][_tokenOut] += fees;
 
         // and other part for sender
-        IERC20(_tokenOut).safeTransfer(msg.sender, fees);
+        depositByOwnerByToken[address(msg.sender)][_tokenOut] += fees;
 
         return _totalAmountOut - fees * 2;
     }

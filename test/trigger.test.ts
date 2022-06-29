@@ -80,9 +80,10 @@ describe("Elvate Core", function () {
           );
           const fees = BigNumber.from(BigNumber.from(values[1])).mul(swapFees).div(10000);
           expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(
-            initialDeposit.add(BigNumber.from(values[1])).sub(fees.mul(2))
+            // sub only the platform fees
+            initialDeposit.add(BigNumber.from(values[1])).sub(fees)
           );
-          expect(await token1.balanceOf(wallet.address)).to.eq(initialBalance.add(fees));
+          expect(await token1.balanceOf(wallet.address)).to.eq(initialBalance);
           expect(await core.depositByOwnerByToken(core.address, token1.address)).to.eq(fees);
         })
       );
@@ -121,7 +122,7 @@ describe("Elvate Core", function () {
           const weight1 = BigNumber.from(values[0]).mul(precision).div(totalAmountIn);
           const amountOut1 = totalAmountOut.mul(weight1).div(precision);
           expect(await core.depositByOwnerByToken(wallet.address, token1.address)).to.eq(
-            initialDeposit.add(amountOut1)
+            initialDeposit.add(amountOut1).add(fees)
           );
           const weight2 = BigNumber.from(values[1]).mul(precision).div(totalAmountIn);
           const amountOut2 = totalAmountOut.mul(weight2).div(precision);
@@ -129,7 +130,7 @@ describe("Elvate Core", function () {
 
           const rest = totalAmountOut.sub(amountOut1).sub(amountOut2);
 
-          expect(await token1.balanceOf(wallet.address)).to.eq(initialBalance.add(fees));
+          expect(await token1.balanceOf(wallet.address)).to.eq(initialBalance);
           expect(await core.depositByOwnerByToken(core.address, token1.address)).to.eq(fees.add(rest));
         })
       );
