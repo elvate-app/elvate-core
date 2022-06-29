@@ -118,7 +118,7 @@ abstract contract ElvatePair is Ownable {
 
     /// @dev get all pairs
     /// @return array of all pairs
-    function getAllPairs() public view returns (Pair[] memory) {
+    function getPairs() public view returns (Pair[] memory) {
         return allPairs;
     }
 

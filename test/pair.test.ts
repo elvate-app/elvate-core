@@ -31,7 +31,7 @@ describe("Elvate Pairs", function () {
 
   describe("Initialisation", () => {
     it("return no pairs", async () => {
-      expect(await core.getAllPairs()).to.eql([]);
+      expect(await core.getPairs()).to.eql([]);
       await expect(core.allPairs(0)).to.reverted;
     });
   });
@@ -45,7 +45,7 @@ describe("Elvate Pairs", function () {
 
     it("return correct pair with one creation", async () => {
       await core.createPair(token0.address, token1.address);
-      expect((await core.getAllPairs())[0]).to.eql([
+      expect((await core.getPairs())[0]).to.eql([
         BigNumber.from(1),
         BigNumber.from(1),
         token0.address,
@@ -60,21 +60,21 @@ describe("Elvate Pairs", function () {
       await core.createPair(token0.address, token1.address);
       await core.createPair(token1.address, token2.address);
       await core.createPair(token2.address, token0.address);
-      expect((await core.getAllPairs())[0]).to.eql([
+      expect((await core.getPairs())[0]).to.eql([
         BigNumber.from(1),
         BigNumber.from(1),
         token0.address,
         token1.address,
         [],
       ]);
-      expect((await core.getAllPairs())[1]).to.eql([
+      expect((await core.getPairs())[1]).to.eql([
         BigNumber.from(2),
         BigNumber.from(1),
         token1.address,
         token2.address,
         [],
       ]);
-      expect((await core.getAllPairs())[2]).to.eql([
+      expect((await core.getPairs())[2]).to.eql([
         BigNumber.from(3),
         BigNumber.from(1),
         token2.address,
@@ -101,7 +101,7 @@ describe("Elvate Pairs", function () {
     it("return correct values with other with sufficient fees", async () => {
       const fees = await core.pairCreationFees();
       await core.connect(other).createPair(token0.address, token1.address, { value: fees });
-      expect((await core.getAllPairs())[0]).to.eql([
+      expect((await core.getPairs())[0]).to.eql([
         BigNumber.from(1),
         BigNumber.from(1),
         token0.address,
@@ -113,7 +113,7 @@ describe("Elvate Pairs", function () {
     it("return correct values with other with too much fees", async () => {
       const fees = await core.pairCreationFees();
       await core.connect(other).createPair(token0.address, token1.address, { value: fees.add(500) });
-      expect((await core.getAllPairs())[0]).to.eql([
+      expect((await core.getPairs())[0]).to.eql([
         BigNumber.from(1),
         BigNumber.from(1),
         token0.address,
@@ -131,9 +131,7 @@ describe("Elvate Pairs", function () {
 
     it("revert on other without fees", async () => {
       const fees = await core.pairCreationFees();
-      await expect(
-        core.connect(other).createPair(token0.address, token1.address)
-      ).to.revertedWith("Insufficient fees");
+      await expect(core.connect(other).createPair(token0.address, token1.address)).to.revertedWith("Insufficient fees");
     });
   });
 });
