@@ -45,15 +45,14 @@ contract ElvateCore is ElvateChest, ElvatePair {
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
     function triggerPair(address _tokenIn, address _tokenOut) external {
-        address[] memory eligibleSubs;
+        Sub[] memory eligibleSubs;
         uint256 swapResult;
         uint256 totalAmountIn;
-        uint256 eligibleSubsLength;
         _trigger(_tokenIn, _tokenOut);
 
-        (eligibleSubs, totalAmountIn, eligibleSubsLength) = getEligibleSubs(_tokenIn, _tokenOut);
+        (eligibleSubs, totalAmountIn) = getEligibleSubs(_tokenIn, _tokenOut);
 
-        require(eligibleSubsLength > 0, "No eligible subscriptions");
+        require(eligibleSubs.length > 0, "No eligible subscriptions");
         require(IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn), "Approve failed");
         require(totalAmountIn > 0, "Nothing to buy");
 
@@ -69,12 +68,12 @@ contract ElvateCore is ElvateChest, ElvatePair {
 
         uint256 totalAmountOut = _deductFees(swapResult, _tokenOut);
 
-        _distributeSwap(_tokenIn, _tokenOut, eligibleSubs, eligibleSubsLength, totalAmountIn, totalAmountOut);
+        _distributeSwap(_tokenIn, _tokenOut, eligibleSubs, totalAmountIn, totalAmountOut);
 
         emit PairTriggered(
             pairIdByTokenInOut[_tokenIn][_tokenOut],
             block.timestamp,
-            eligibleSubsLength,
+            eligibleSubs.length,
             totalAmountIn,
             totalAmountOut,
             swapFees
@@ -84,34 +83,39 @@ contract ElvateCore is ElvateChest, ElvatePair {
     /// @dev get list of all eligible subscriptions for a pair
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
+    /// @return list of eligible subs and total amount in
     function getEligibleSubs(address _tokenIn, address _tokenOut)
         public
         view
         onlyExistingPair(_tokenIn, _tokenOut)
-        returns (
-            address[] memory,
-            uint256,
-            uint256
-        )
+        returns (Sub[] memory, uint256)
     {
         uint256 pairId = pairIdByTokenInOut[_tokenIn][_tokenOut];
-        address[] memory eligibleSubs = new address[](allPairs[pairId - 1].subs.length);
         Pair memory pair = allPairs[pairId - 1];
         uint256 totalAmountIn;
         uint256 count;
 
         for (uint256 index; index < pair.subs.length; index++) {
-            if (
-                depositByOwnerByToken[pair.subs[index]][pair.tokenIn] >=
-                subAmountInByOwnerPairId[pair.subs[index]][pairId]
-            ) {
-                eligibleSubs[count] = pair.subs[index];
-                totalAmountIn += subAmountInByOwnerPairId[pair.subs[index]][pairId];
+            address owner = pair.subs[index];
+            if (depositByOwnerByToken[owner][pair.tokenIn] >= subAmountInByOwnerPairId[owner][pairId]) {
                 count++;
             }
         }
 
-        return (eligibleSubs, totalAmountIn, count);
+        Sub[] memory eligibleSubs = new Sub[](count);
+        count = 0;
+
+        for (uint256 index; index < pair.subs.length; index++) {
+            address owner = pair.subs[index];
+            uint256 amountIn = subAmountInByOwnerPairId[owner][pairId];
+            if (depositByOwnerByToken[owner][pair.tokenIn] >= amountIn) {
+                eligibleSubs[count] = Sub(amountIn, owner);
+                totalAmountIn += amountIn;
+                count++;
+            }
+        }
+
+        return (eligibleSubs, totalAmountIn);
     }
 
     /// @dev deduct fees and distribute them to contract and sender
@@ -136,26 +140,24 @@ contract ElvateCore is ElvateChest, ElvatePair {
     function _distributeSwap(
         address _tokenIn,
         address _tokenOut,
-        address[] memory _eligibleSubs,
-        uint256 _eligibleSubsLength,
+        Sub[] memory _eligibleSubs,
         uint256 _totalAmountIn,
         uint256 _totalAmountOut
     ) internal {
-        uint256 pairId = pairIdByTokenInOut[_tokenIn][_tokenOut];
         uint256 totalAmountOutDistributed;
 
-        for (uint256 index; index < _eligibleSubsLength; index++) {
-            depositByOwnerByToken[_eligibleSubs[index]][_tokenIn] -= subAmountInByOwnerPairId[_eligibleSubs[index]][
-                pairId
-            ];
+        for (uint256 index; index < _eligibleSubs.length; index++) {
+            address owner = _eligibleSubs[index].owner;
+            uint256 amountIn = _eligibleSubs[index].amountIn;
+            depositByOwnerByToken[owner][_tokenIn] -= amountIn;
 
             // weight of sub
-            uint256 weight = (subAmountInByOwnerPairId[_eligibleSubs[index]][pairId] * precision) / _totalAmountIn;
+            uint256 weight = (amountIn * precision) / _totalAmountIn;
 
             // add amountOut to user based on weight of sub
             uint256 amountOut = (_totalAmountOut * weight) / precision;
 
-            depositByOwnerByToken[_eligibleSubs[index]][_tokenOut] += amountOut;
+            depositByOwnerByToken[owner][_tokenOut] += amountOut;
 
             // keep track of all amountOut
             totalAmountOutDistributed += amountOut;

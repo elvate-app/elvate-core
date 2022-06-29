@@ -64,21 +64,18 @@ describe("Elvate Core", function () {
         const subs = await core.getEligibleSubs(token0.address, token1.address);
         expect(subs[0].length).to.eq(0);
         expect(subs[1]).to.eq(0);
-        expect(subs[2]).to.eq(0);
       });
 
       it("return no subscription for token1, token2", async () => {
         const subs = await core.getEligibleSubs(token1.address, token2.address);
         expect(subs[0].length).to.eq(0);
         expect(subs[1]).to.eq(0);
-        expect(subs[2]).to.eq(0);
       });
 
       it("return no subscription for token2, token0", async () => {
         const subs = await core.getEligibleSubs(token2.address, token0.address);
         expect(subs[0].length).to.eq(0);
         expect(subs[1]).to.eq(0);
-        expect(subs[2]).to.eq(0);
       });
 
       it("revert for invalid pair", async () => {
@@ -94,23 +91,21 @@ describe("Elvate Core", function () {
       it("return only one subscription for token0, token1", async function () {
         const subs = await core.getEligibleSubs(token0.address, token1.address);
         expect(subs[0].length).to.eq(1);
-        expect(subs[0][0]).to.eq(other.address);
+        expect(subs[0][0].owner).to.eq(other.address);
+        expect(subs[0][0].amountIn).to.eq(50);
         expect(subs[1]).to.eq(50);
-        expect(subs[2]).to.eq(1);
       });
 
       it("return no subscriptions for token1, token2", async function () {
         const subs = await core.getEligibleSubs(token1.address, token2.address);
         expect(subs[0].length).to.eq(0);
         expect(subs[1]).to.eq(0);
-        expect(subs[2]).to.eq(0);
       });
 
       it("return no subscriptions for token2, token0", async function () {
         const subs = await core.getEligibleSubs(token1.address, token2.address);
         expect(subs[0].length).to.eq(0);
         expect(subs[1]).to.eq(0);
-        expect(subs[2]).to.eq(0);
       });
 
       it("revert for invalid pair", async () => {
@@ -126,9 +121,9 @@ describe("Elvate Core", function () {
       it("return only one subscription for token0, token1", async function () {
         const subs = await core.getEligibleSubs(token0.address, token1.address);
         expect(subs[0].length).to.eq(1);
-        expect(subs[0][0]).to.eq(other.address);
+        expect(subs[0][0].owner).to.eq(other.address);
+        expect(subs[0][0].amountIn).to.eq(10000000);
         expect(subs[1]).to.eq(10000000);
-        expect(subs[2]).to.eq(1);
       });
     });
 
@@ -145,10 +140,11 @@ describe("Elvate Core", function () {
         it("return two valid subscriptions to token0, token1", async () => {
           const subs = await core.getEligibleSubs(token0.address, token1.address);
           expect(subs[0].length).to.eq(2);
-          expect(subs[0][0]).to.eq(wallet.address);
-          expect(subs[0][1]).to.eq(other.address);
+          expect(subs[0][0].owner).to.eq(wallet.address);
+          expect(subs[0][0].amountIn).to.eq(50);
+          expect(subs[0][1].owner).to.eq(other.address);
+          expect(subs[0][1].amountIn).to.eq(180);
           expect(subs[1]).to.eq(230);
-          expect(subs[2]).to.eq(2);
         });
 
         it("return no valid subscriptions to token1, token2", async () => {
@@ -156,7 +152,6 @@ describe("Elvate Core", function () {
           // 0 Subs for token1, token2
           expect(subs[0].length).to.eq(0);
           expect(subs[1]).to.eq(0);
-          expect(subs[2]).to.eq(0);
         });
 
         it("revert for invalid pair", async () => {
@@ -171,18 +166,16 @@ describe("Elvate Core", function () {
 
         it("return one valid subscriptions to token0, token1", async () => {
           const subs = await core.getEligibleSubs(token0.address, token1.address);
-          expect(subs[0].length).to.eq(2);
-          expect(subs[0][0]).to.eq(wallet.address);
-          expect(subs[0][1]).to.eq(constants.AddressZero);
+          expect(subs[0].length).to.eq(1);
+          expect(subs[0][0].owner).to.eq(wallet.address);
+          expect(subs[0][0].amountIn).to.eq(50);
           expect(subs[1]).to.eq(50);
-          expect(subs[2]).to.eq(1);
         });
 
         it("return no valid subscriptions to token1, token2", async () => {
           const subs = await core.getEligibleSubs(token1.address, token2.address);
           expect(subs[0].length).to.eq(0);
           expect(subs[1]).to.eq(0);
-          expect(subs[2]).to.eq(0);
         });
 
         it("revert for invalid pair", async () => {
