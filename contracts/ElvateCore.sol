@@ -51,7 +51,7 @@ contract ElvateCore is ElvateChest, ElvatePair {
         uint256 eligibleSubsLength;
         _trigger(_tokenIn, _tokenOut);
 
-        (eligibleSubs, totalAmountIn, eligibleSubsLength) = getEligibleSubscription(_tokenIn, _tokenOut);
+        (eligibleSubs, totalAmountIn, eligibleSubsLength) = getEligibleSubs(_tokenIn, _tokenOut);
 
         require(eligibleSubsLength > 0, "No eligible subscriptions");
         require(IERC20(_tokenIn).approve(routerContractAddress, totalAmountIn), "Approve failed");
@@ -84,7 +84,7 @@ contract ElvateCore is ElvateChest, ElvatePair {
     /// @dev get list of all eligible subscriptions for a pair
     /// @param _tokenIn address of input token
     /// @param _tokenOut address of output token
-    function getEligibleSubscription(address _tokenIn, address _tokenOut)
+    function getEligibleSubs(address _tokenIn, address _tokenOut)
         public
         view
         onlyExistingPair(_tokenIn, _tokenOut)
