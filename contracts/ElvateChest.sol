@@ -31,8 +31,8 @@ abstract contract ElvateChest is Ownable {
     /// @param _token address of token to deposit
     /// @param _amount amount of token to deposit
     function depositToken(address _token, uint256 _amount) external {
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         depositByOwnerByToken[msg.sender][_token] += _amount;
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         emit TokenDeposited(msg.sender, _token, _amount);
     }
 
@@ -58,8 +58,8 @@ abstract contract ElvateChest is Ownable {
     function withdrawTokenFees(address _token) external onlyOwner {
         uint256 dep = depositByOwnerByToken[address(this)][_token];
         require(dep > 0, "Nothing to withdraw");
-        IERC20(_token).safeTransfer(msg.sender, dep);
         depositByOwnerByToken[address(this)][_token] -= dep;
+        IERC20(_token).safeTransfer(msg.sender, dep);
     }
 
     /// @dev withdraw all pair creation fees
